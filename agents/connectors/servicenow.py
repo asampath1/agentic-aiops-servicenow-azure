@@ -82,7 +82,9 @@ class ServiceNowITSM(ITSMClient):
 
     # ------------------------------------------------------------------ ITSMClient
     def open_incidents(self) -> list[Incident]:
-        rows = self._get("incident", f"correlation_id={self.tag}^state=1^assignment_groupISEMPTY", self._INC_FIELDS)
+        # Not filtered on an empty assignment group: a PDI's assignment rules fill it from the CI's
+        # support group on insert. Whatever is there is redacted before the agents see it.
+        rows = self._get("incident", f"correlation_id={self.tag}^state=1", self._INC_FIELDS)
         return [redact_open(self._incident(r)) for r in rows]
 
     def resolved_incidents(self) -> list[Incident]:
@@ -90,7 +92,8 @@ class ServiceNowITSM(ITSMClient):
         return [self._incident(r) for r in rows]
 
     def kb_articles(self) -> list[KBArticle]:
-        rows = self._get("kb_knowledge", f"metaLIKE{self.tag}^workflow_state=published",
+        # Not filtered on workflow_state=published: the KB publish workflow can leave inserted articles in draft.
+        rows = self._get("kb_knowledge", f"metaLIKE{self.tag}^workflow_state!=retired",
                          "sys_id,number,short_description,text,meta")
         return [parse_kb(_dv(r["number"]) or _val(r["sys_id"]), _dv(r["short_description"]) or "",
                          _val(r.get("text")) or "", _dv(r.get("meta")) or "") for r in rows]

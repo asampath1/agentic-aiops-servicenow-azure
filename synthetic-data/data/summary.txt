@@ -13,5 +13,5 @@ problems            4
 incidents         320
 
 Incidents: resolved/closed=296, open (eval set)=24
-Change-caused incidents: 30
-Incidents linked to problems: 69
+Change-caused incidents: 27 (history only; eval links are in ground_truth.json)
+Incidents linked to problems: 64 (history only)

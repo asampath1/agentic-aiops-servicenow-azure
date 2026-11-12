@@ -1,0 +1,12 @@
+{
+ "source": "local",
+ "telemetry": "synthetic",
+ "automation": "mock",
+ "reasoner": "heuristic",
+ "model": null,
+ "effort": null,
+ "approver": "simulate",
+ "incidents": 24,
+ "run_at": "2026-11-12T09:49:06+00:00",
+ "llm_usage": null
+}

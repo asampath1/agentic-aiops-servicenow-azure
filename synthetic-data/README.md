@@ -63,7 +63,8 @@ After loading, `data/ground_truth.loaded.json` maps each eval incident to its re
 ### Verify in ServiceNow
 - Incidents: `incident.list` filter **Correlation ID = SYNTH-SKR**
 - Open evaluation set: same filter plus **State = New** (the assignment group is intentionally blank, so routing is your agent's job)
-- Changes that caused incidents: open an incident and look at the **Caused by Change** field
+- Changes that caused incidents: open a resolved incident and look at the **Caused by Change** field. The open eval incidents have
+  **Caused by Change** and **Problem** left blank on purpose: finding those links is the agents' job, and the answers are only in `ground_truth.json`
 - KB: Knowledge > IT knowledge base, search "Azure"
 
 ## Notes and gotchas

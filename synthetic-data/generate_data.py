@@ -412,9 +412,11 @@ class Gen:
             if closed < self.now:
                 post["closed_at"] = ts(closed)
             rec["_post_patch"] = post
-        if chg_key:
+        # Eval incidents are "just opened": the links are what the agents must find, so they live
+        # only in ground_truth.json. Writing them here would hand the answer to anything reading the PDI.
+        if chg_key and not eval_mode:
             rec["caused_by"] = "@" + chg_key
-        if link_problem:
+        if link_problem and not eval_mode:
             rec["problem_id"] = f"@prb:{prb}"
         self.recs["incidents"].append(rec)
 
@@ -506,8 +508,8 @@ class Gen:
         lines = [f"{COMPANY} synthetic ITSM dataset  (tag {TAG})", f"Window: {ts(self.start)} -> {ts(self.now)} UTC", ""]
         lines += [f"{s:15s} {len(self.recs[s]):5d}" for s in self.ORDER]
         lines += ["", "Incidents: " + ", ".join(f"{k}={v}" for k, v in c.items()),
-                  f"Change-caused incidents: {sum(1 for i in self.recs['incidents'] if 'caused_by' in i)}",
-                  f"Incidents linked to problems: {sum(1 for i in self.recs['incidents'] if 'problem_id' in i)}"]
+                  f"Change-caused incidents (history only; eval links are in ground_truth.json): {sum(1 for i in self.recs['incidents'] if 'caused_by' in i)}",
+                  f"Incidents linked to problems (history only): {sum(1 for i in self.recs['incidents'] if 'problem_id' in i)}"]
         (out / "summary.txt").write_text("\n".join(lines) + "\n")
         print("\n".join(lines))
 

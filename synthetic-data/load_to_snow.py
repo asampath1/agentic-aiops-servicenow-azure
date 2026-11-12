@@ -79,7 +79,7 @@ class Snow:
             if r.status_code in (429, 502, 503, 504):
                 time.sleep(2 * (attempt + 1))
                 continue
-            if r.status_code in (401, 403):
+            if r.status_code == 401:
                 self._auth_fail(r)
             return r
         return r
@@ -99,6 +99,8 @@ class Snow:
                                   "sysparm_limit": 1})
         except requests.RequestException as e:
             sys.exit(f"Cannot reach {self.base}: {e}\nCheck SN_INSTANCE (e.g. dev123456) and that the PDI is awake.")
+        if r.status_code == 403:
+            self._auth_fail(r)
         if r.status_code >= 300 or "json" not in r.headers.get("Content-Type", ""):
             sys.exit(f"Unexpected response from {self.base} (HTTP {r.status_code}). Is the PDI awake? "
                      f"Log in once in a browser, then retry.\n{r.text[:200]}")
@@ -112,6 +114,47 @@ class Snow:
         r.raise_for_status()
         res = r.json()["result"]
         return res[0]["sys_id"] if res else None
+
+    def _get(self, table, query, fields):
+        r = self._req("GET", f"{self.base}/api/now/table/{table}",
+                      params={"sysparm_query": query, "sysparm_fields": fields, "sysparm_limit": 200})
+        return r.json().get("result", []) if r.status_code < 300 else []
+
+    def close_code_map(self):
+        """Map the generator's close codes onto this instance's choices.
+
+        Releases differ: the field may be labelled "Close code" or "Resolution code", the stored values
+        may be "Solution provided" or "Solved (Permanently)", and some releases add a separate mandatory
+        resolution-code field. Returns {field: {our_value: instance_value}} for every such field.
+        """
+        if self.dry:
+            return {}
+        fields = {"close_code"}
+        for d in self._get("sys_dictionary", "name=incident^column_labelINResolution code,Close code", "element"):
+            if d.get("element"):
+                fields.add(d["element"])
+        wanted = {"Solution provided": ("solution provided", "solved permanently", "solved", "resolved"),
+                  "Workaround provided": ("workaround provided", "solved work around", "workaround"),
+                  "Resolved by change": ("resolved by change", "solution provided", "solved permanently", "solved")}
+        norm = lambda x: " ".join("".join(c if c.isalnum() else " " for c in (x or "").lower()).split())  # noqa: E731
+        out = {}
+        for f in sorted(fields):
+            choices = [(c["value"], c["label"]) for c in
+                       self._get("sys_choice", f"name=incident^element={f}^inactive=false", "value,label")]
+            if not choices:
+                continue
+            m = {}
+            for ours, prefs in wanted.items():
+                pick = None
+                for p in prefs:
+                    pick = next((v for v, lbl in choices if norm(v) == p or norm(lbl) == p), None) or \
+                        next((v for v, lbl in choices if p in norm(v) or p in norm(lbl)), None)
+                    if pick:
+                        break
+                m[ours] = pick or choices[0][0]
+            out[f] = m
+            print(f"  close codes for incident.{f}: " + ", ".join(f"{k} -> {v}" for k, v in m.items()))
+        return out
 
     def insert(self, table, body):
         if self.dry:
@@ -147,6 +190,7 @@ def load(args):
     sn.check()
     only = set(args.only.split(",")) if args.only else None
     errors = 0
+    close_map = None
 
     def resolve(v):
         if not (isinstance(v, str) and v.startswith("@")):
@@ -182,6 +226,13 @@ def load(args):
                 print(f"  x {key}: skipped, {e.args[0]} (that record was not created)")
                 continue
             body = {k: v for k, v in body.items() if v not in (None, "")}
+            if table == "incident" and body.get("close_code"):
+                if close_map is None:
+                    close_map = sn.close_code_map()
+                ours = body["close_code"]
+                for field, m in close_map.items():
+                    if ours in m:
+                        body[field] = m[ours]
             sys_id, info = sn.insert(table, body)
             if not sys_id and rec.get("_retry_drop"):
                 for f in rec["_retry_drop"]:

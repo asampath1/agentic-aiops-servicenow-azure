@@ -43,9 +43,10 @@ python3 generate_data.py --days 180 --incidents 320 --eval 24 --seed 42
 # 2. wake your PDI (log in once in the browser), then set credentials
 export SN_INSTANCE=dev123456          # your PDI name
 export SN_USER=admin
-export SN_PASSWORD='********'
+export SN_PASSWORD='********'     # single quotes, so $ and ! in the password survive the shell
 
-# 3. check offline that every reference resolves
+# 3. check the login works (one read call), then that every reference resolves offline
+python3 load_to_snow.py --check
 python3 load_to_snow.py --dry-run
 
 # 4. load (≈ 900 API calls, ~10-20 min on a PDI)

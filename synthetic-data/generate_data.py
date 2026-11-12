@@ -485,6 +485,8 @@ class Gen:
         (out / "ground_truth.json").write_text(json.dumps(self.truth, indent=1))
         for s in self.ORDER:
             rows = self.recs[s]
+            if s == "cis":   # the CI class is the record's table; agents use it to check runbook targets
+                rows = [dict(r, sys_class_name=r["_table"]) for r in rows]
             cols = []
             for r in rows:
                 for k in r:

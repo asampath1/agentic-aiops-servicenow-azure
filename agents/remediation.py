@@ -5,7 +5,9 @@ Policy (enforced in code, not by any model):
 2. Only runbooks the KB marks "safe to run automatically" can be proposed for automation.
    Everything else becomes a manual recommendation for the resolver group.
 3. Noise tickets, missing CIs and low-confidence triage never get automation.
-4. Nothing runs without an ``Approver`` returning approved=True.
+4. A runbook is only automated on a target it has been used on before: the same CI, or a CI of the
+   same class (e.g. an IIS recycle that only ever ran on Windows VMs is not auto-run on an App Service).
+5. Nothing runs without an ``Approver`` returning approved=True.
 """
 from __future__ import annotations
 
@@ -59,7 +61,10 @@ class RemediationAgent:
         self.min_confidence = min_confidence
 
     def plan(self, inc: Incident, decision: TriageDecision, kb: Optional[KBArticle],
-             signals: dict[str, list[str]]) -> RemediationPlan:
+             signals: dict[str, list[str]], prior_targets: Optional[set[str]] = None,
+             ci_class: str = "") -> RemediationPlan:
+        """``prior_targets``: CI names and classes this runbook was used on in past incidents
+        (``None`` skips the check, e.g. when no history is available)."""
         if decision.is_noise or not kb or not kb.runbook:
             return RemediationPlan(runbook=None, mode="none", safe_to_automate=False,
                                    reason="no runbook applies (end-user issue or no KB runbook)")
@@ -75,6 +80,10 @@ class RemediationAgent:
         if decision.confidence < self.min_confidence:
             return RemediationPlan(runbook=kb.runbook, mode="manual", safe_to_automate=True, parameters=params,
                                    reason=f"triage confidence {decision.confidence:.2f} < {self.min_confidence}")
+        if prior_targets is not None and inc.ci not in prior_targets and not (ci_class and ci_class in prior_targets):
+            target = f"{inc.ci}" + (f" or any {ci_class}" if ci_class else "")
+            return RemediationPlan(runbook=kb.runbook, mode="manual", safe_to_automate=True, parameters=params,
+                                   reason=f"{kb.runbook} has no prior use on {target} in incident history")
         return RemediationPlan(runbook=kb.runbook, mode="automated", safe_to_automate=True, parameters=params,
                                reason=f"KB '{kb.title}' marks {kb.runbook} safe to run with approval")
 

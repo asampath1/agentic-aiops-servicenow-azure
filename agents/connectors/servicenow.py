@@ -44,6 +44,7 @@ class ServiceNowITSM(ITSMClient):
         self.s.headers.update({"Accept": "application/json", "Content-Type": "application/json"})
         self.write, self.timeout, self.tag = write, timeout, tag
         self._group_ids: dict[str, str] = {}
+        self._ci_cache: dict[str, Optional[ConfigItem]] = {}
 
     # ------------------------------------------------------------------ helpers
     def _get(self, table: str, query: str, fields: str, limit: int = 1000) -> list[dict[str, Any]]:
@@ -61,7 +62,9 @@ class ServiceNowITSM(ITSMClient):
 
     _INC_FIELDS = ("sys_id,number,short_description,description,caller_id,category,impact,urgency,cmdb_ci,"
                    "business_service,opened_at,contact_type,state,assignment_group,work_notes,close_notes,"
-                   "caused_by,problem_id,resolved_at")
+                   "caused_by,problem_id,u_caused_by,u_problem_id,resolved_at")
+    # Some PDIs have no incident.problem_id / incident.caused_by; load_to_snow.py --relink then stores the
+    # links in custom u_ reference fields. Fields that don't exist are simply absent from the response.
 
     def _incident(self, r: dict[str, Any]) -> Incident:
         def num(x):
@@ -77,8 +80,9 @@ class ServiceNowITSM(ITSMClient):
             ci=_dv(r.get("cmdb_ci")), business_service=_dv(r.get("business_service")),
             opened_at=_val(r.get("opened_at")), contact_type=_val(r.get("contact_type")), state=_val(r.get("state")),
             assignment_group=_dv(r.get("assignment_group")), work_notes=_dv(r.get("work_notes")) or "",
-            close_notes=_dv(r.get("close_notes")) or "", caused_by=_dv(r.get("caused_by")),
-            problem_id=_dv(r.get("problem_id")), resolved_at=_val(r.get("resolved_at")))
+            close_notes=_dv(r.get("close_notes")) or "",
+            caused_by=_dv(r.get("caused_by")) or _dv(r.get("u_caused_by")),
+            problem_id=_dv(r.get("problem_id")) or _dv(r.get("u_problem_id")), resolved_at=_val(r.get("resolved_at")))
 
     # ------------------------------------------------------------------ ITSMClient
     def open_incidents(self) -> list[Incident]:
@@ -120,12 +124,16 @@ class ServiceNowITSM(ITSMClient):
                        end=_val(r.get("end_date")), state=_dv(r.get("state"))) for r in rows]
 
     def config_item(self, name: str) -> Optional[ConfigItem]:
-        rows = self._get("cmdb_ci", f"name={name}", "name,short_description,support_group", limit=1)
-        if not rows:
-            return None
-        r = rows[0]
-        return ConfigItem(name=name, description=(_dv(r.get("short_description")) or "").replace("[SYNTH-SKR] ", ""),
-                          support_group=_dv(r.get("support_group")))
+        if name in self._ci_cache:
+            return self._ci_cache[name]
+        rows = self._get("cmdb_ci", f"name={name}", "name,short_description,support_group,sys_class_name", limit=1)
+        ci = None
+        if rows:
+            r = rows[0]
+            ci = ConfigItem(name=name, description=(_dv(r.get("short_description")) or "").replace("[SYNTH-SKR] ", ""),
+                            support_group=_dv(r.get("support_group")), ci_class=_val(r.get("sys_class_name")) or "")
+        self._ci_cache[name] = ci
+        return ci
 
     def related_cis(self, name: str) -> list[str]:
         rows = self._get("cmdb_rel_ci", f"parent.name={name}^ORchild.name={name}", "parent,child")

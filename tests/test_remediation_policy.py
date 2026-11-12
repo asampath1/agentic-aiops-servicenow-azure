@@ -39,3 +39,23 @@ def test_noise_low_confidence_and_missing_ci_are_not_automated():
     assert agent.plan(_inc(), _dec(noise=True), SAFE, {}).mode == "none"
     assert agent.plan(_inc(), _dec(conf=0.1), SAFE, {}).mode == "manual"
     assert agent.plan(_inc(ci=None), _dec(), SAFE, {}).mode == "manual"
+
+
+def test_runbook_not_automated_on_a_target_it_never_ran_on():
+    # inc:0312 on the PDI: an IIS recycle (only ever run on Windows VMs) chosen for an App Service.
+    agent = RemediationAgent(MockAutomation(), SimulatedApprover())
+    history = {"vm-ecom-web-01", "vm-ecom-web-02", "cmdb_ci_win_server"}
+    plan = agent.execute(_inc("app-ecom-api-prod"),
+                         agent.plan(_inc("app-ecom-api-prod"), _dec(), SAFE, {}, prior_targets=history,
+                                    ci_class="cmdb_ci_appl"))
+    assert plan.mode == "manual" and not plan.executed and "no prior use" in plan.reason
+    never_used = agent.plan(_inc(), _dec(), SAFE, {}, prior_targets=set(), ci_class="cmdb_ci_win_server")
+    assert never_used.mode == "manual"
+
+
+def test_runbook_automated_on_same_ci_or_same_class():
+    agent = RemediationAgent(MockAutomation(), SimulatedApprover())
+    history = {"vm-ecom-web-01", "cmdb_ci_win_server"}
+    assert agent.plan(_inc("vm-ecom-web-01"), _dec(), SAFE, {}, prior_targets=history).mode == "automated"
+    assert agent.plan(_inc("vm-hr-batch-01"), _dec(), SAFE, {}, prior_targets=history,
+                      ci_class="cmdb_ci_win_server").mode == "automated"

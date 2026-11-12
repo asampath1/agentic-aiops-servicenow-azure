@@ -14,6 +14,8 @@ Usage:
   python3 load_to_snow.py                    # load everything
   python3 load_to_snow.py --only users,groups,group_members
   python3 load_to_snow.py --cleanup          # delete everything recorded in data/manifest.json
+  python3 load_to_snow.py --relink           # (re)write incident problem/change links; on instances
+                                             # without incident.problem_id / caused_by, adds u_ fields
 
 How references work: a value "@user:synth.arjun.iyer" means "the sys_id of the record
 created with that _key"; "@lookup:table:field=value" is queried once from the instance.
@@ -156,6 +158,37 @@ class Snow:
             print(f"  close codes for incident.{f}: " + ", ".join(f"{k} -> {v}" for k, v in m.items()))
         return out
 
+    # Standard incident reference fields -> (custom fallback, referenced table, label).
+    REF_FIELDS = {"problem_id": ("u_problem_id", "problem", "Problem (SYNTH-SKR)"),
+                  "caused_by": ("u_caused_by", "change_request", "Caused by Change (SYNTH-SKR)")}
+
+    def incident_ref_fields(self, create=False):
+        """Return {standard field: field to write on this instance}, or None for a field with nowhere to go.
+
+        Some PDIs have no incident.problem_id / incident.caused_by: writes to them are dropped silently.
+        With create=True the custom u_ reference fields are added to the incident table (a schema change).
+        """
+        if self.dry:
+            return {f: f for f in self.REF_FIELDS}
+        out = {}
+        for std, (custom, ref, label) in self.REF_FIELDS.items():
+            if self._get("sys_dictionary", f"nameINincident,task^element={std}", "element"):
+                out[std] = std
+            elif self._get("sys_dictionary", f"name=incident^element={custom}", "element"):
+                out[std] = custom
+            elif create:
+                r = self._req("POST", f"{self.base}/api/now/table/sys_dictionary", json={
+                    "name": "incident", "element": custom, "column_label": label,
+                    "internal_type": "reference", "reference": ref, "active": "true"})
+                ok = r.status_code < 300 and self._get("sys_dictionary", f"name=incident^element={custom}", "element")
+                if not ok:
+                    sys.exit(f"Could not create incident.{custom}: HTTP {r.status_code} {r.text[:300]}")
+                print(f"  + created field incident.{custom} (reference to {ref}); incident.{std} does not exist here")
+                out[std] = custom
+            else:
+                out[std] = None
+        return out
+
     def insert(self, table, body):
         if self.dry:
             return uuid.uuid4().hex, None
@@ -191,6 +224,7 @@ def load(args):
     only = set(args.only.split(",")) if args.only else None
     errors = 0
     close_map = None
+    ref_map = None
 
     def resolve(v):
         if not (isinstance(v, str) and v.startswith("@")):
@@ -226,6 +260,17 @@ def load(args):
                 print(f"  x {key}: skipped, {e.args[0]} (that record was not created)")
                 continue
             body = {k: v for k, v in body.items() if v not in (None, "")}
+            if table == "incident" and any(f in body for f in Snow.REF_FIELDS):
+                if ref_map is None:
+                    ref_map = sn.incident_ref_fields()
+                    missing = [f for f, t in ref_map.items() if not t]
+                    if missing:
+                        print(f"  ! incident has no {', '.join(missing)} field: run --relink after the load")
+                for std, target in ref_map.items():
+                    if std in body and target != std:
+                        v = body.pop(std)
+                        if target:
+                            body[target] = v
             if table == "incident" and body.get("close_code"):
                 if close_map is None:
                     close_map = sn.close_code_map()
@@ -271,6 +316,57 @@ def load(args):
     return errors
 
 
+def relink(args):
+    """Write incident -> problem / change links for incidents already loaded (listed in the manifest).
+
+    For PDIs without incident.problem_id / incident.caused_by: creates u_problem_id / u_caused_by
+    (unless --dry-run) and patches the links from the load plan into whichever fields exist.
+    """
+    data_dir = Path(args.data)
+    plan = json.loads((data_dir / "load_plan.json").read_text())
+    man_path = data_dir / "manifest.json"
+    if not man_path.exists():
+        sys.exit("No data/manifest.json - load the data first.")
+    created = json.loads(man_path.read_text())["records"]
+    sn = Snow(args.dry_run)
+    sn.check()
+    ref_map = sn.incident_ref_fields(create=not args.dry_run)
+    print("Fields: " + ", ".join(f"{s} -> incident.{t}" for s, t in ref_map.items()))
+    done = errors = 0
+    for stage in plan["stages"]:
+        for rec in stage["records"]:
+            if rec["_table"] != "incident" or not any(rec.get(f) for f in ref_map):
+                continue
+            inc = created.get(rec["_key"])
+            if not inc:
+                print(f"  x {rec['_key']}: not in manifest (not loaded)")
+                errors += 1
+                continue
+            body = {}
+            for std, target in ref_map.items():
+                v = rec.get(std)
+                if v and target:
+                    ref = created.get(v[1:])          # "@prb:PRB_X" -> manifest key "prb:PRB_X"
+                    if not ref:
+                        print(f"  x {rec['_key']}: {v} not in manifest")
+                        errors += 1
+                        continue
+                    body[target] = ref["sys_id"]
+            if not body:
+                continue
+            err = sn.patch("incident", inc["sys_id"], body)
+            if err:
+                print(f"  x {rec['_key']} ({inc.get('number')}): {err}")
+                errors += 1
+                continue
+            done += 1
+            if done % 25 == 0:
+                print(f"  ... {done}")
+    verb = "would patch" if args.dry_run else "patched"
+    print(f"\nDone. {verb} {done} incidents, {errors} errors.")
+    return errors
+
+
 def cleanup(args):
     data_dir = Path(args.data)
     man_path = data_dir / "manifest.json"
@@ -301,9 +397,13 @@ if __name__ == "__main__":
     ap.add_argument("--delay", type=float, default=0.0, help="seconds to sleep between records")
     ap.add_argument("--cleanup", action="store_true", help="delete everything listed in the manifest")
     ap.add_argument("--check", action="store_true", help="only test the connection and credentials")
+    ap.add_argument("--relink", action="store_true",
+                    help="(re)write incident problem/change links; adds u_ fields if the instance lacks them")
     a = ap.parse_args()
     if a.check:
         Snow(False).check()
+    elif a.relink:
+        sys.exit(1 if relink(a) else 0)
     elif a.cleanup:
         cleanup(a)
     else:

@@ -1,0 +1,23 @@
+PROJECT BRIEF – agentic-aiops-servicenow-azure
+Owner: Anand (Azure Managed Services, DXC). Goal: portfolio project proving AI-led IT ops skills.
+Repo: https://github.com/asampath1/agentic-aiops-servicenow-azure (public)
+
+Fictional company: ShopKart Retails (SKR). Tag SYNTH-SKR, emails @shopkart-demo.example,
+groups "SKR <name>" (Service Desk L1, Azure Infra Ops, Azure Database Ops, App Support - eCommerce,
+App Support - Enterprise Apps, Identity & Access Mgmt, Network & Security Ops,
+Cloud Platform Engineering, Backup & DR, Data Platform Ops).
+
+Environment: Azure free tier + personal ServiceNow PDI.
+
+Done:
+- synthetic-data/: generate_data.py, patterns.py (18 Azure failure patterns + noise),
+  load_to_snow.py (REST Table API loader, resumable, --dry-run, --cleanup).
+- Dataset: 75 users, 10 groups, 28 CIs, 7 services, 20 KB, ~73 changes, 4 problems,
+  296 resolved incidents + 24 open eval incidents; ground_truth.json = answer key (agents must not read it).
+- Repo pushed with README, roadmap and architecture diagram.
+
+Architecture (multi-agent): Triage orchestrator -> Knowledge (RAG), Change correlation,
+Diagnostics (Azure Log Analytics), Remediation (Azure Automation runbook, human approval required),
+Ticket updater writes back to ServiceNow.
+
+Next: load data into the PDI, then build the triage orchestrator and the evaluation scoring.

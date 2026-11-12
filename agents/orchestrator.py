@@ -47,7 +47,9 @@ class TriageOrchestrator:
                       diagnostics=self.diagnostics.run(inc), ci=asdict(ci) if ci else None)
         decision = self.reasoner.decide(inc, ev)
         kb = self.knowledge.kb_article(decision.kb_article)
-        plan = self.remediation.plan(inc, decision, kb, ev.diagnostics.get("signals", {}))
+        plan = self.remediation.plan(inc, decision, kb, ev.diagnostics.get("signals", {}),
+                                     prior_targets=self.knowledge.runbook_targets(kb.runbook) if kb and kb.runbook else None,
+                                     ci_class=ci.ci_class if ci else "")
         plan = self.remediation.execute(inc, plan)
         result = TriageResult(incident_key=inc.key, incident_number=inc.number,
                               short_description=inc.short_description, decision=decision,

@@ -32,6 +32,9 @@ cd synthetic-data && python3 load_to_snow.py --check                            
   gets 401 on the REST API on this PDI. Never commit credentials.
 - The PDI's assignment rules pre-fill the assignment group from the CI on new incidents, and KB articles
   may stay in Draft after insert; the ServiceNow connector accounts for both.
+- This PDI's incident table has no `problem_id` / `caused_by` fields (writes to them are silently dropped).
+  `load_to_snow.py --relink` creates `u_problem_id` / `u_caused_by` and patches the links; the connector reads
+  either name. KB HTML on the PDI is entity-escaped (`&amp;`); `kb_parse` unescapes it.
 - `data/manifest.json` and `ground_truth.loaded.json` are local loader state (gitignored).
 
 ## Status (2026-11-12)

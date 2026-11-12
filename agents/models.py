@@ -104,6 +104,7 @@ class ConfigItem:
     description: str = ""
     support_group: Optional[str] = None
     os: str = ""
+    ci_class: str = ""          # e.g. cmdb_ci_win_server, cmdb_ci_appl
 
 
 # ---------------------------------------------------------------------------- agent outputs

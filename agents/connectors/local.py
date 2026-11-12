@@ -113,7 +113,8 @@ class LocalITSM(ITSMClient):
         if not c:
             return None
         return ConfigItem(name=name, description=c["short_description"].replace("[SYNTH-SKR] ", ""),
-                          support_group=self._grp(c["support_group"]), os=c.get("os", ""))
+                          support_group=self._grp(c["support_group"]), os=c.get("os", ""),
+                          ci_class=c.get("sys_class_name", ""))
 
     def related_cis(self, name: str) -> list[str]:
         out = []

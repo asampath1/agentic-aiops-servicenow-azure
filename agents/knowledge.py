@@ -33,11 +33,30 @@ class KnowledgeAgent:
         self.history = itsm.resolved_incidents()
         self.problems: dict[str, Problem] = {p.key: p for p in itsm.problems()}
         self.k_similar = k_similar
+        self.itsm = itsm
+        self._rb_targets: Optional[dict[str, set[str]]] = None
         self._kb_index = BM25(self.kb, [f"{a.title} {a.title} {a.symptoms} {a.meta} {a.cause}" for a in self.kb])
         self._inc_index = BM25(self.history, [f"{i.short_description} {i.description}" for i in self.history])
 
     def kb_article(self, title: Optional[str]) -> Optional[KBArticle]:
         return self.kb_by_title.get(title) if title else None
+
+    def runbook_targets(self, runbook: str) -> set[str]:
+        """CI names and CI classes a runbook was used on in resolved incidents (empty if never used)."""
+        if self._rb_targets is None:
+            self._rb_targets = defaultdict(set)
+            classes: dict[str, str] = {}
+            for h in self.history:
+                rb = runbook_of(h)
+                if not (rb and h.ci):
+                    continue
+                if h.ci not in classes:
+                    ci = self.itsm.config_item(h.ci)
+                    classes[h.ci] = ci.ci_class if ci else ""
+                self._rb_targets[rb].add(h.ci)
+                if classes[h.ci]:
+                    self._rb_targets[rb].add(classes[h.ci])
+        return set(self._rb_targets.get(runbook, ()))
 
     def run(self, inc: Incident) -> dict[str, Any]:
         query = inc.text + (f" {inc.ci}" if inc.ci else "")

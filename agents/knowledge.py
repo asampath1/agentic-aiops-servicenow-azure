@@ -30,7 +30,9 @@ class KnowledgeAgent:
         self.kb = itsm.kb_articles()
         self.kb_by_title = {a.title: a for a in self.kb}
         self.kb_by_runbook = {a.runbook: a for a in self.kb if a.runbook}
-        self.history = itsm.resolved_incidents()
+        # Most recent first: BM25 ties (identical alert text) then resolve by recency rather than by the
+        # order the source happens to return rows, so local CSV and ServiceNow runs agree.
+        self.history = sorted(itsm.resolved_incidents(), key=lambda h: (h.opened_at or "", h.key), reverse=True)
         self.problems: dict[str, Problem] = {p.key: p for p in itsm.problems()}
         self.k_similar = k_similar
         self.itsm = itsm

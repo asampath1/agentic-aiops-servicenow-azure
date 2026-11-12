@@ -39,6 +39,9 @@ cd synthetic-data && python3 load_to_snow.py --check                            
 
 ## Status (2026-11-12)
 - Done: dataset loaded into the PDI (612 records); offline heuristic baseline 24/24 routing, 0 unsafe actions.
-- Next: re-run triage against the live PDI and compare with the offline baseline; then `--write` work notes;
+- Done: live PDI triage matches the offline baseline on all 24 incidents (24/24 routing, 22/22 KB, 5/5 problems,
+  root cause 21/24, 13/13 safe auto-remediation, 0 unsafe). Root cause was 22/24 before retrieval ties were made
+  deterministic; inc:0302 was right by row-order luck (history majority favours the wrong cause).
+- Next: `--write` work notes;
   then the Claude reasoner run; then the Azure side (Log Analytics workspace, VMs named like the CMDB CIs,
   Automation account with the safe runbooks, alert rule -> ServiceNow).

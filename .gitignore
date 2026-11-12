@@ -15,3 +15,4 @@ venv/
 # triage runs (commit selected results under evaluation/results/ instead)
 runs/
 .pytest_cache/
+.DS_Store

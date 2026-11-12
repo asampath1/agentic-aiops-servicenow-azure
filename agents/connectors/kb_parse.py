@@ -33,5 +33,6 @@ def parse_kb(key: str, title: str, text: str, meta: str = "") -> KBArticle:
     grp = re.search(r"Resolver group:\s*([^<\n]+)", text)
     return KBArticle(key=key, title=title, text=strip_html(text),
                      symptoms=_section(text, "Symptoms"), cause=_section(text, "Cause"),
-                     resolver_group=grp.group(1).strip() if grp else None,
+                     # ServiceNow stores the HTML entity-escaped ("SKR Backup &amp; DR"); the CSVs don't.
+                     resolver_group=html.unescape(grp.group(1)).strip() if grp else None,
                      runbook=runbook, safe_to_automate=bool(runbook) and safe, meta=meta or "")

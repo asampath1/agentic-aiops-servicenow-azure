@@ -12,6 +12,13 @@ def test_safe_flag_parsing():
     assert none.runbook is None and not none.safe_to_automate
 
 
+def test_resolver_group_html_entities_unescaped():
+    # The PDI returns KB HTML with "&amp;"; a raw match split group votes and routed a
+    # Key Vault incident to an unrelated (auto-runnable) runbook.
+    a = parse_kb("k", "t", "<h3>Escalation</h3><p>Resolver group: SKR Identity &amp; Access Mgmt</p>")
+    assert a.resolver_group == "SKR Identity & Access Mgmt"
+
+
 def test_dataset_kb():
     kb = LocalITSM().kb_articles()
     assert len(kb) == 20

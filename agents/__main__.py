@@ -56,8 +56,7 @@ def main(argv=None) -> int:
         itsm = ServiceNowITSM(write=a.write)
 
     if a.telemetry == "synthetic":
-        if a.source != "local":
-            ap.error("--telemetry synthetic needs --source local")
+        # Works with either source: the stand-in workspace is built from the alert payloads in the incidents.
         logs = SyntheticLogAnalytics(itsm)
     else:
         from .connectors.azure import AzureLogAnalytics

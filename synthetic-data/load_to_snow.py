@@ -9,6 +9,7 @@ Credentials come from environment variables (never hard-code them):
   SN_PASSWORD   your PDI admin password
 
 Usage:
+  python3 load_to_snow.py --check            # test the credentials only (one read call)
   python3 load_to_snow.py --dry-run          # resolve every reference offline, call nothing
   python3 load_to_snow.py                    # load everything
   python3 load_to_snow.py --only users,groups,group_members
@@ -26,11 +27,30 @@ import sys
 import time
 import uuid
 from pathlib import Path
+from urllib.parse import urlparse
 
 try:
     import requests
 except ImportError:  # dry-run still works without requests
     requests = None
+
+
+class AuthError(SystemExit):
+    """Raised on 401/403 so the load stops at once instead of failing every record."""
+
+
+AUTH_HELP = """
+ServiceNow rejected the credentials ({status}) for user '{user}' on {base}.
+Check:
+  1. SN_USER / SN_PASSWORD are the *instance* admin login (the one shown under
+     developer.servicenow.com > Manage instance password), not your developer.servicenow.com account.
+  2. The password reached Python intact. Shells expand $ ! ` inside double quotes, so set it in
+     single quotes:   export SN_PASSWORD='p@ss$word!'     (PowerShell: $env:SN_PASSWORD='p@ss$word!')
+     Password seen by the loader: {pw_len} characters{pw_ws}.
+  3. The instance is awake: log in once at {base} in a browser (PDIs hibernate).
+  4. The account is not locked out after the failed attempts (log in as admin in the browser to check).
+Then run:  python3 load_to_snow.py --check
+"""
 
 
 class Snow:
@@ -39,12 +59,16 @@ class Snow:
         if dry:
             return
         inst = os.environ.get("SN_INSTANCE", "").strip()
-        user, pw = os.environ.get("SN_USER"), os.environ.get("SN_PASSWORD")
+        user, pw = (os.environ.get("SN_USER") or "").strip(), os.environ.get("SN_PASSWORD") or ""
         if not (inst and user and pw):
             sys.exit("Set SN_INSTANCE, SN_USER and SN_PASSWORD environment variables first.")
         if requests is None:
             sys.exit("pip install requests")
-        self.base = inst if inst.startswith("http") else f"https://{inst}.service-now.com"
+        if inst.startswith("http"):
+            self.base = f"https://{urlparse(inst).netloc}"     # drop any path such as /now/nav/ui
+        else:
+            self.base = f"https://{inst.removesuffix('.service-now.com')}.service-now.com"
+        self.user, self.pw = user, pw
         self.s = requests.Session()
         self.s.auth = (user, pw)
         self.s.headers.update({"Accept": "application/json", "Content-Type": "application/json"})
@@ -55,8 +79,32 @@ class Snow:
             if r.status_code in (429, 502, 503, 504):
                 time.sleep(2 * (attempt + 1))
                 continue
+            if r.status_code == 401:
+                self._auth_fail(r)
             return r
         return r
+
+    def _auth_fail(self, r):
+        ws = " (has leading/trailing whitespace!)" if self.pw != self.pw.strip() else ""
+        raise AuthError(AUTH_HELP.format(status=f"HTTP {r.status_code}", user=self.user, base=self.base,
+                                         pw_len=len(self.pw), pw_ws=ws) + f"\nServer said: {r.text[:200]}")
+
+    def check(self):
+        """One read call that proves the login works and has the roles the load needs."""
+        if self.dry:
+            return
+        try:
+            r = self._req("GET", f"{self.base}/api/now/table/sys_user",
+                          params={"sysparm_query": f"user_name={self.user}", "sysparm_fields": "sys_id,user_name",
+                                  "sysparm_limit": 1})
+        except requests.RequestException as e:
+            sys.exit(f"Cannot reach {self.base}: {e}\nCheck SN_INSTANCE (e.g. dev123456) and that the PDI is awake.")
+        if r.status_code == 403:
+            self._auth_fail(r)
+        if r.status_code >= 300 or "json" not in r.headers.get("Content-Type", ""):
+            sys.exit(f"Unexpected response from {self.base} (HTTP {r.status_code}). Is the PDI awake? "
+                     f"Log in once in a browser, then retry.\n{r.text[:200]}")
+        print(f"Connected to {self.base} as {self.user}.")
 
     def query_one(self, table, field, value):
         if self.dry:
@@ -66,6 +114,47 @@ class Snow:
         r.raise_for_status()
         res = r.json()["result"]
         return res[0]["sys_id"] if res else None
+
+    def _get(self, table, query, fields):
+        r = self._req("GET", f"{self.base}/api/now/table/{table}",
+                      params={"sysparm_query": query, "sysparm_fields": fields, "sysparm_limit": 200})
+        return r.json().get("result", []) if r.status_code < 300 else []
+
+    def close_code_map(self):
+        """Map the generator's close codes onto this instance's choices.
+
+        Releases differ: the field may be labelled "Close code" or "Resolution code", the stored values
+        may be "Solution provided" or "Solved (Permanently)", and some releases add a separate mandatory
+        resolution-code field. Returns {field: {our_value: instance_value}} for every such field.
+        """
+        if self.dry:
+            return {}
+        fields = {"close_code"}
+        for d in self._get("sys_dictionary", "name=incident^column_labelINResolution code,Close code", "element"):
+            if d.get("element"):
+                fields.add(d["element"])
+        wanted = {"Solution provided": ("solution provided", "solved permanently", "solved", "resolved"),
+                  "Workaround provided": ("workaround provided", "solved work around", "workaround"),
+                  "Resolved by change": ("resolved by change", "solution provided", "solved permanently", "solved")}
+        norm = lambda x: " ".join("".join(c if c.isalnum() else " " for c in (x or "").lower()).split())  # noqa: E731
+        out = {}
+        for f in sorted(fields):
+            choices = [(c["value"], c["label"]) for c in
+                       self._get("sys_choice", f"name=incident^element={f}^inactive=false", "value,label")]
+            if not choices:
+                continue
+            m = {}
+            for ours, prefs in wanted.items():
+                pick = None
+                for p in prefs:
+                    pick = next((v for v, lbl in choices if norm(v) == p or norm(lbl) == p), None) or \
+                        next((v for v, lbl in choices if p in norm(v) or p in norm(lbl)), None)
+                    if pick:
+                        break
+                m[ours] = pick or choices[0][0]
+            out[f] = m
+            print(f"  close codes for incident.{f}: " + ", ".join(f"{k} -> {v}" for k, v in m.items()))
+        return out
 
     def insert(self, table, body):
         if self.dry:
@@ -98,8 +187,10 @@ def load(args):
     created = manifest["records"]           # _key -> {table, sys_id, number}
     lookups = {}
     sn = Snow(args.dry_run)
+    sn.check()
     only = set(args.only.split(",")) if args.only else None
     errors = 0
+    close_map = None
 
     def resolve(v):
         if not (isinstance(v, str) and v.startswith("@")):
@@ -127,8 +218,21 @@ def load(args):
             key, table = rec["_key"], rec["_table"]
             if key in created:
                 continue
-            body = {k: resolve(v) for k, v in rec.items() if not k.startswith("_")}
+            try:
+                body = {k: resolve(v) for k, v in rec.items() if not k.startswith("_")}
+            except KeyError as e:
+                # A record it depends on failed earlier: skip this one, keep going, re-run later to resume.
+                errors += 1
+                print(f"  x {key}: skipped, {e.args[0]} (that record was not created)")
+                continue
             body = {k: v for k, v in body.items() if v not in (None, "")}
+            if table == "incident" and body.get("close_code"):
+                if close_map is None:
+                    close_map = sn.close_code_map()
+                ours = body["close_code"]
+                for field, m in close_map.items():
+                    if ours in m:
+                        body[field] = m[ours]
             sys_id, info = sn.insert(table, body)
             if not sys_id and rec.get("_retry_drop"):
                 for f in rec["_retry_drop"]:
@@ -174,6 +278,7 @@ def cleanup(args):
         sys.exit("No data/manifest.json - nothing to clean up.")
     manifest = json.loads(man_path.read_text())
     sn = Snow(args.dry_run)
+    sn.check()
     # delete in reverse creation order (incidents first, users last)
     items = list(manifest["records"].items())[::-1]
     print(f"Deleting {len(items)} records ...")
@@ -195,8 +300,11 @@ if __name__ == "__main__":
     ap.add_argument("--only", help="comma-separated stages to load")
     ap.add_argument("--delay", type=float, default=0.0, help="seconds to sleep between records")
     ap.add_argument("--cleanup", action="store_true", help="delete everything listed in the manifest")
+    ap.add_argument("--check", action="store_true", help="only test the connection and credentials")
     a = ap.parse_args()
-    if a.cleanup:
+    if a.check:
+        Snow(False).check()
+    elif a.cleanup:
         cleanup(a)
     else:
         sys.exit(1 if load(a) else 0)

@@ -36,6 +36,10 @@ pip install anthropic
 python -m agents --reasoner claude --out runs/claude
 python -m evaluation.score runs/claude/predictions.json
 
+# live PDI, nothing else live yet: read incidents from ServiceNow, dry-run writes, no runbooks run
+python -m agents --source servicenow --telemetry synthetic --automation mock --approver deny --out runs/pdi
+python -m evaluation.score runs/pdi/predictions.json --truth synthetic-data/data/ground_truth.loaded.json
+
 # live PDI (read + dry-run writes), real Log Analytics, runbooks only after a person approves at the console
 export SN_INSTANCE=devXXXXXX SN_USER=admin SN_PASSWORD='...'
 export LOG_ANALYTICS_WORKSPACE_ID=... AZURE_SUBSCRIPTION_ID=... AUTOMATION_RESOURCE_GROUP=... AUTOMATION_ACCOUNT=...

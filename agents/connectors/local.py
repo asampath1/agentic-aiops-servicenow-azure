@@ -150,7 +150,7 @@ class SyntheticLogAnalytics(LogAnalyticsClient):
     The KQL text is recorded but not interpreted.
     """
 
-    def __init__(self, itsm: LocalITSM, now: Optional[datetime] = None):
+    def __init__(self, itsm: ITSMClient, now: Optional[datetime] = None):
         self.queries: list[dict[str, Any]] = []
         self._rows: dict[str, list[dict[str, Any]]] = {}
         incidents = itsm.open_incidents() + itsm.resolved_incidents()

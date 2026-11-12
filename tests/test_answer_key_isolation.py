@@ -59,3 +59,20 @@ def test_no_agent_module_references_answer_key():
     local = (AGENTS_DIR / "connectors" / "local.py").read_text()
     assert 'FORBIDDEN_NAME_PARTS = ("ground_truth",)' in local
     assert local.count("ground_truth") == 1
+
+
+def test_dataset_itself_has_no_answers_on_open_incidents():
+    """What the loader pushes into ServiceNow must not carry the eval answers either."""
+    import csv
+    import json
+    with open(DEFAULT_DATA_DIR / "csv" / "incidents.csv", newline="") as f:
+        open_rows = [r for r in csv.DictReader(f) if r["state"] == "1"]
+    assert len(open_rows) == 24
+    for r in open_rows:
+        for field in ("caused_by", "problem_id", "assignment_group", "assigned_to", "work_notes", "close_notes"):
+            assert not r[field], f"{r['_key']}.{field} is set in incidents.csv"
+    plan = json.loads((DEFAULT_DATA_DIR / "load_plan.json").read_text())
+    for stage in plan["stages"]:
+        for rec in stage["records"]:
+            if rec.get("_table") == "incident" and rec.get("state") == "1":
+                assert "caused_by" not in rec and "problem_id" not in rec, rec["_key"]

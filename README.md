@@ -35,8 +35,9 @@ flowchart TD
 
 ```
 synthetic-data/      ShopKart Retails ITSM dataset generator + ServiceNow loader (start here)
-agents/              (planned) orchestrator and specialist agents
-evaluation/          (planned) scoring against synthetic-data/data/ground_truth.json
+agents/              triage orchestrator, specialist agents, ServiceNow/Azure connectors (offline mocks included)
+evaluation/          scoring against synthetic-data/data/ground_truth.json, plus committed results
+tests/               pytest suite, including answer-key isolation and remediation safety
 docs/                (planned) design notes, demo screenshots
 ```
 
@@ -44,12 +45,15 @@ docs/                (planned) design notes, demo screenshots
 
 - [x] Synthetic enterprise data: 300+ incidents, CMDB, KB, changes, problems, and a 24-incident eval set
 - [ ] Load data into a ServiceNow PDI
-- [ ] Triage orchestrator (routing + priority)
-- [ ] Knowledge agent (vector search over KB and resolved incidents)
-- [ ] Change-correlation agent
-- [ ] Diagnostics agent (Azure Log Analytics on a free-tier subscription)
-- [ ] Remediation agent with approval gate (Azure Automation)
-- [ ] Evaluation report: routing accuracy, root-cause match, MTTR saved, unsafe-action rate = 0
+- [x] Triage orchestrator (routing + priority), heuristic and Claude reasoners
+- [x] Knowledge agent (BM25 over KB and resolved incidents; swap for vector search later)
+- [x] Change-correlation agent
+- [x] Diagnostics agent (KQL per resource type; synthetic workspace offline, Log Analytics connector for live)
+- [x] Remediation agent with approval gate (Azure Automation connector, KB-safe runbooks only)
+- [x] Evaluation scoring: routing, KB, runbook, root-cause match, change/problem linking, unsafe-action rate
+- [ ] Run against the live PDI and a free-tier Log Analytics workspace
+- [ ] Claude reasoner vs heuristic comparison on the eval set
+- [ ] MTTR saved (needs live timings)
 - [ ] Demo video
 
 ## Quick start
@@ -63,3 +67,14 @@ python3 load_to_snow.py --dry-run && python3 load_to_snow.py
 ```
 
 See [synthetic-data/README.md](synthetic-data/README.md) for details.
+
+### Triage and score (offline, no credentials)
+
+```bash
+python -m agents --out runs/latest          # triage the 24 open incidents
+python -m evaluation.score runs/latest/predictions.json
+pip install pytest && python -m pytest -q
+```
+
+Baseline results: [evaluation/README.md](evaluation/README.md). How the agents work, the live
+ServiceNow / Azure / Claude options and the guardrails: [agents/README.md](agents/README.md).

@@ -11,3 +11,7 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# triage runs (commit selected results under evaluation/results/ instead)
+runs/
+.pytest_cache/

@@ -78,6 +78,10 @@ def main(argv=None) -> int:
 
     orch = TriageOrchestrator(itsm, logs, automation, reasoner=reasoner, approver=approver)
     incidents = itsm.open_incidents()[: a.limit]
+    print(f"Source {a.source}: {len(incidents)} open incidents, {len(orch.knowledge.history)} resolved incidents, "
+          f"{len(orch.knowledge.kb)} KB articles, {len(orch.knowledge.problems)} problems, {len(groups)} groups")
+    if not orch.knowledge.kb or not orch.knowledge.history:
+        print("WARNING: no KB articles or no resolved incidents found - triage will be poor. Check the source data.")
     results = orch.run(incidents)
 
     preds = [r.to_dict() for r in results]

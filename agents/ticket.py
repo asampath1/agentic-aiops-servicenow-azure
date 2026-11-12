@@ -24,7 +24,12 @@ def render_work_note(r: TriageResult) -> str:
     if ev.diagnostics.get("ran"):
         lines.append(f"Log Analytics: {ev.diagnostics.get('row_count', 0)} rows; signals {ev.diagnostics.get('signals')}")
     if rem.mode == "automated":
-        status = "EXECUTED job " + rem.job["job_id"] if rem.executed else f"awaiting approval ({(rem.approval or {}).get('reason', 'pending')})"
+        if rem.executed and (rem.job or {}).get("simulated"):
+            status = f"SIMULATED run only (mock automation, nothing changed), job {rem.job['job_id']}"
+        elif rem.executed:
+            status = "EXECUTED job " + rem.job["job_id"]
+        else:
+            status = f"awaiting approval ({(rem.approval or {}).get('reason', 'pending')})"
         lines.append(f"Remediation: runbook {rem.runbook} proposed, {status}")
     elif rem.mode == "manual":
         lines.append(f"Remediation: manual, follow {rem.runbook} ({rem.reason})")

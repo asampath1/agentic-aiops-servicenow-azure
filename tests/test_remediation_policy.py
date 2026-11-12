@@ -59,3 +59,23 @@ def test_runbook_automated_on_same_ci_or_same_class():
     assert agent.plan(_inc("vm-ecom-web-01"), _dec(), SAFE, {}, prior_targets=history).mode == "automated"
     assert agent.plan(_inc("vm-hr-batch-01"), _dec(), SAFE, {}, prior_targets=history,
                       ci_class="cmdb_ci_win_server").mode == "automated"
+
+
+def test_work_note_never_claims_a_simulated_job_executed():
+    from agents.models import Evidence, RemediationPlan, TriageResult
+    from agents.ticket import render_work_note
+    plan = RemediationPlan(runbook="RB-Safe", mode="automated", safe_to_automate=True, executed=True,
+                           job={"job_id": "j1", "simulated": True})
+    note = render_work_note(TriageResult(incident_key="inc:x", incident_number=None, short_description="t",
+                                         decision=_dec(), remediation=plan,
+                                         evidence=Evidence(kb_candidates=[], similar_incidents=[],
+                                                           problem_candidates=[], change_candidates=[],
+                                                           diagnostics={}, ci=None)))
+    assert "SIMULATED" in note and "EXECUTED" not in note
+
+
+def test_write_refuses_simulated_approver():
+    import pytest
+    from agents.__main__ import main
+    with pytest.raises(SystemExit):
+        main(["--source", "servicenow", "--write", "--approver", "simulate", "--automation", "mock"])

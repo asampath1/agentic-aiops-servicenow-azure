@@ -45,6 +45,9 @@ def main(argv=None) -> int:
 
     if a.approver == "simulate" and a.automation != "mock":
         ap.error("--approver simulate is only allowed with --automation mock")
+    if a.write and a.approver == "simulate":
+        ap.error("--write with --approver simulate would record approvals nobody gave; "
+                 "use --approver deny (proposals only) or interactive")
 
     out = Path(a.out or f"runs/{datetime.now(timezone.utc):%Y%m%d-%H%M%S}")
     out.mkdir(parents=True, exist_ok=True)

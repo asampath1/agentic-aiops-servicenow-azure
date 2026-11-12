@@ -42,6 +42,8 @@ cd synthetic-data && python3 load_to_snow.py --check                            
 - Done: live PDI triage matches the offline baseline on all 24 incidents (24/24 routing, 22/22 KB, 5/5 problems,
   root cause 21/24, 13/13 safe auto-remediation, 0 unsafe). Root cause was 22/24 before retrieval ties were made
   deterministic; inc:0302 was right by row-order luck (history majority favours the wrong cause).
-- Next: `--write` work notes;
-  then the Claude reasoner run; then the Azure side (Log Analytics workspace, VMs named like the CMDB CIs,
+- Done: `--write` work notes posted to all 24 open eval incidents (`--approver deny`, 24x HTTP 200; also sets the
+  assignment group). Work notes are a journal: another `--write` run adds a second note to every ticket.
+  `--write` refuses `--approver simulate`; simulated jobs are labelled SIMULATED in notes.
+- Next: the Claude reasoner run (without `--write`); then the Azure side (Log Analytics workspace, VMs named like the CMDB CIs,
   Automation account with the safe runbooks, alert rule -> ServiceNow).

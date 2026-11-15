@@ -6,6 +6,9 @@ targetScope = 'subscription'
 @description('Azure region. Central India offers B2ats_v2 to free-trial subscriptions (non-zonal).')
 param location string = 'centralindia'
 
+@description('Region for the Automation account. Free-trial subscriptions may create Automation accounts only in eastus, eastus2, westus, northeurope, southeastasia, japanwest. Run Command works across regions.')
+param automationLocation string = 'southeastasia'
+
 @description('Resource group for every demo resource; `az group delete` on it is the teardown.')
 param resourceGroupName string = 'rg-skr-aiops-demo'
 
@@ -53,6 +56,16 @@ module demo 'modules/demo.bicep' = {
   }
 }
 
+module automation 'modules/automation.bicep' = {
+  scope: rg
+  name: 'skr-aiops-automation'
+  params: {
+    location: automationLocation
+    tags: tags
+    workspaceResourceId: demo.outputs.workspaceResourceId
+  }
+}
+
 resource budget 'Microsoft.Consumption/budgets@2023-11-01' = if (!empty(budgetContactEmail)) {
   name: 'budget-skr-aiops-demo'
   properties: {
@@ -85,3 +98,4 @@ output resourceGroup string = rg.name
 output workspaceId string = demo.outputs.workspaceCustomerId
 output workspaceResourceId string = demo.outputs.workspaceResourceId
 output vmName string = demo.outputs.vmName
+output automationAccount string = automation.outputs.automationAccountName

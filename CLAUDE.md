@@ -55,5 +55,9 @@ cd synthetic-data && python3 load_to_snow.py --check                            
 - Done (2026-11-15): Azure Phase 1 deployed: workspace `law-skr-aiops`, `vm-orders-app-01` (Ubuntu, B2ats_v2, no public
   IP, AMA + DCR for Perf/Syslog/Heartbeat, auto-shutdown 22:00 IST). Linux only; the Windows/IIS scenario was dropped
   to save credit.
-- Next: Phase 2 Automation account + `RB-VM-Restart-Service` / `RB-VM-Cleanup-Disk`; Phase 3 alerts -> Logic App ->
-  ServiceNow; Phase 4 fault scripts + `--telemetry azure --automation azure` run.
+- Done (2026-11-15): Azure Phase 2: Automation account `aa-skr-aiops` in Southeast Asia (trial can't create Automation in
+  Central India), custom role (VM read + Run Command, RG only), runbooks published via `infra/publish-runbooks.sh`.
+  Verified through `agents.connectors.azure.AzureAutomation`: cleanup job Completed; restart job refused `sshd`.
+- Next: Phase 3 alerts -> Logic App -> ServiceNow; Phase 4 fault scripts + `--telemetry azure --automation azure` run.
+  Phase 4 fixes: Diagnostics KQL uses `Available MBytes` (Linux reports `Available MBytes Memory`) and needs Syslog
+  for the process name (Linux Perf has no per-process data).

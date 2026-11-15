@@ -6,8 +6,8 @@ triage with real KQL -> approved Azure Automation runbook -> fixed.
 
 | Phase | What | Status |
 |---|---|---|
-| 1 | Log Analytics workspace, `vm-orders-app-01` (Ubuntu, B2ats_v2, no public IP), Azure Monitor Agent + DCR (Perf, Syslog, Heartbeat), nightly auto-shutdown, optional budget | `main.bicep` |
-| 2 | Automation account (managed identity), safe runbooks `RB-VM-Restart-Service`, `RB-VM-Cleanup-Disk` | planned |
+| 1 | Log Analytics workspace, `vm-orders-app-01` (Ubuntu, B2ats_v2, no public IP), Azure Monitor Agent + DCR (Perf, Syslog, Heartbeat), nightly auto-shutdown, optional budget | deployed |
+| 2 | Automation account `aa-skr-aiops` (managed identity, custom role: VM read + Run Command on this RG only, local auth off), safe runbooks `RB-VM-Restart-Service`, `RB-VM-Cleanup-Disk`, job logs to the workspace | deployed |
 | 3 | Alert rules (CPU > 90 %, low disk) -> action group -> Logic App -> ServiceNow incident | planned |
 | 4 | Fault scripts (runaway `python3`, disk fill) + `--telemetry azure --automation azure` triage run | planned |
 
@@ -32,6 +32,9 @@ az deployment sub what-if -l centralindia -n skr-aiops-demo -f infra/main.bicep 
 az deployment sub create -l centralindia -n skr-aiops-demo -f infra/main.bicep \
   -p adminSshPublicKey="$(cat ~/.ssh/skr_aiops_demo.pub)"
 
+# Upload + publish the runbook bodies (infra/runbooks/*.ps1); re-run after editing one
+infra/publish-runbooks.sh
+
 # Workspace id for the agents (LOG_ANALYTICS_WORKSPACE_ID)
 az deployment sub show -n skr-aiops-demo --query properties.outputs.workspaceId.value -o tsv
 
@@ -46,6 +49,20 @@ az vm start -g rg-skr-aiops-demo -n vm-orders-app-01
 az group delete -n rg-skr-aiops-demo --yes
 az consumption budget delete --budget-name budget-skr-aiops-demo
 ```
+
+## Runbook guards
+
+Both runbooks act only on VMs in `TargetResourceGroup` tagged `dataset=SYNTH-SKR`, Linux only.
+`RB-VM-Restart-Service` refuses system processes (sshd, waagent, the monitoring agent, systemd, ...) and only stops
+processes above 50 % CPU. `RB-VM-Cleanup-Disk` never deletes files: it vacuums the journal, cleans the apt cache and
+truncates `/var/log/**/*.log` over 100 MB (keeping the last 1 MB).
+
+## Free-trial limits met so far
+
+- VM sizes: B1s/B2s are blocked; B2ats_v2 / B2als_v2 work in Central India, non-zonal only.
+- Automation accounts can only be created in eastus, eastus2, westus, northeurope, southeastasia, japanwest, so the
+  account lives in Southeast Asia (`automationLocation`); Run Command works across regions.
+- 4 vCPUs per region.
 
 ## Cost notes
 

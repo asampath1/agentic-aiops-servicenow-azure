@@ -9,6 +9,7 @@ ServiceNow Personal Developer Instance (PDI). All data is synthetic (tag `SYNTH-
   `agents/connectors/` (local CSV / ServiceNow / Azure). See `agents/README.md`.
 - `evaluation/score.py` scores a run against `synthetic-data/data/ground_truth.json`. See `evaluation/README.md`.
 - `tests/` pytest suite (`python -m pytest -q`)
+- `infra/` Bicep for the live Azure demo (subscription-scope `main.bicep` + `modules/demo.bicep`). See `infra/README.md`.
 
 ## Hard rules
 - Agents must never read `ground_truth.json` (or `ground_truth.loaded.json`). Only `evaluation/score.py` may.
@@ -36,6 +37,10 @@ cd synthetic-data && python3 load_to_snow.py --check                            
   `load_to_snow.py --relink` creates `u_problem_id` / `u_caused_by` and patches the links; the connector reads
   either name. KB HTML on the PDI is entity-escaped (`&amp;`); `kb_parse` unescapes it.
 - `data/manifest.json` and `ground_truth.loaded.json` are local loader state (gitignored).
+- Azure: free-trial subscription `sub-skr-aiops-demo` (spending limit on, 4 vCPU per region), region Central India.
+  The trial is blocked from B1s/B2s; B2ats_v2 / B2als_v2 work only non-zonal. `az login --use-device-code`.
+  Everything lives in `rg-skr-aiops-demo`; `az group delete -n rg-skr-aiops-demo` is the teardown.
+  The 24-incident eval stays on synthetic telemetry; Azure is a live end-to-end demo of single alerts.
 
 ## Status (2026-11-12)
 - Done: dataset loaded into the PDI (612 records); offline heuristic baseline 24/24 routing, 0 unsafe actions.
@@ -45,5 +50,10 @@ cd synthetic-data && python3 load_to_snow.py --check                            
 - Done: `--write` work notes posted to all 24 open eval incidents (`--approver deny`, 24x HTTP 200; also sets the
   assignment group). Work notes are a journal: another `--write` run adds a second note to every ticket.
   `--write` refuses `--approver simulate`; simulated jobs are labelled SIMULATED in notes.
-- Next: the Claude reasoner run (without `--write`); then the Azure side (Log Analytics workspace, VMs named like the CMDB CIs,
-  Automation account with the safe runbooks, alert rule -> ServiceNow).
+- Deferred (2026-11-15): the live Claude reasoner run, until an Anthropic API key is bought. Code + stub tests are ready
+  (`python -m agents --reasoner claude --out runs/claude -v`, ~$1-2, no `--write`).
+- Done (2026-11-15): Azure Phase 1 deployed: workspace `law-skr-aiops`, `vm-orders-app-01` (Ubuntu, B2ats_v2, no public
+  IP, AMA + DCR for Perf/Syslog/Heartbeat, auto-shutdown 22:00 IST). Linux only; the Windows/IIS scenario was dropped
+  to save credit.
+- Next: Phase 2 Automation account + `RB-VM-Restart-Service` / `RB-VM-Cleanup-Disk`; Phase 3 alerts -> Logic App ->
+  ServiceNow; Phase 4 fault scripts + `--telemetry azure --automation azure` run.

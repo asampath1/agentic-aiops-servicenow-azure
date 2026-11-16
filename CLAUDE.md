@@ -58,6 +58,11 @@ cd synthetic-data && python3 load_to_snow.py --check                            
 - Done (2026-11-15): Azure Phase 2: Automation account `aa-skr-aiops` in Southeast Asia (trial can't create Automation in
   Central India), custom role (VM read + Run Command, RG only), runbooks published via `infra/publish-runbooks.sh`.
   Verified through `agents.connectors.azure.AzureAutomation`: cleanup job Completed; restart job refused `sshd`.
-- Next: Phase 3 alerts -> Logic App -> ServiceNow; Phase 4 fault scripts + `--telemetry azure --automation azure` run.
+- Done (2026-11-16): Azure Phase 3: `infra/alerts.bicep` (deployed by the user from VS Code with SN creds): alert rules
+  `vm-cpu-high` / `vm-disk-low` -> `ag-skr-servicenow` -> Logic App `la-skr-alert-to-snow` -> PDI incident tagged
+  `correlation_id=SYNTH-SKR-LIVE` (alert id in `correlation_display`). Tested with a crafted Fired + Resolved payload:
+  created INC0010597 (CI + caller resolved) and added the resolved work note. INC0010597 is a test incident.
+- Next: Phase 4 fault scripts + `--telemetry azure --automation azure` run; the ServiceNow connector must read open
+  incidents tagged `SYNTH-SKR-LIVE` while keeping `SYNTH-SKR` history for retrieval.
   Phase 4 fixes: Diagnostics KQL uses `Available MBytes` (Linux reports `Available MBytes Memory`) and needs Syslog
   for the process name (Linux Perf has no per-process data).

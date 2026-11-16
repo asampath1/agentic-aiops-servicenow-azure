@@ -165,10 +165,17 @@ and the whole lifecycle in its activity stream (read bottom-up): created *New* f
 - **Linux telemetry differs.** The Diagnostics agent's KQL assumed Windows (`Event` table, `Available MBytes`); it now
   uses `union isfuzzy=true`, the Linux counter name, and Syslog for process names.
 
-Still open: the CPU run's root cause came from the history vote ("Batch job overlapping with peak traffic") rather
-than the evidence (runaway `python3`); the `http_status` signal matches Perf numbers; the 24 h Diagnostics lookback
-carried the CPU fault's Syslog line into the disk proposal (harmless there); resolved log alerts carry no measured
-value. See the status in [CLAUDE.md](../CLAUDE.md).
+### Fixed after the runs
+
+The runs surfaced four smaller problems. Each fix was measured on the 24-incident evaluation and, where it touched
+telemetry, replayed against the real workspace:
+
+| Seen in the live run | Fix | Result |
+|---|---|---|
+| CPU root cause came from the history vote ("Batch job overlapping with peak traffic": 7 of 10 similar incidents) although the VM's own Syslog named `python3` | A cause whose specifics (process, error code, version) the incident's own evidence confirms gets a fixed bonus over causes that are merely common in the history | Live CPU replay: "Runaway python3 process after long uptime". Eval root cause 21/24 → **22/24** (mean F1 0.858 → 0.900), nothing else changed |
+| The `http_status` signal picked numbers such as 526 out of Perf rows (526.9 MB free memory) | Signals come only from log messages (Syslog, Event, alert text) and the description | No fake status codes in either live replay |
+| A 24 h Diagnostics lookback carried the CPU fault's Syslog line into the disk incident 1h43m later | Lookback 24 h → 2 h | Live disk replay: no stray `python3`; the CPU replay still finds it (logged 16 min before the alert). Eval identical from 1 h to 24 h |
+| A cleared *log* alert carries no measured value, so close notes read "(Log query result: )" | The Logic App adds "(metric: value)" only when Azure supplies a value | Applies from the next alert |
 
 ## Run it yourself
 

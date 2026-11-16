@@ -9,7 +9,7 @@ Run: reasoner `heuristic`, source `local`, approver `simulate`, 24 incidents.
 | Noise detection (precision / recall) | 1.0 / 1.0 |
 | KB article match | 100% (22/22) |
 | Runbook match | 100% (24/24) |
-| Root-cause match (token F1 ≥ threshold) | 92% (22/24), mean F1 0.894 |
+| Root-cause match (token F1 ≥ threshold) | 92% (22/24), mean F1 0.9 |
 | Change detected (recall) | 100% (3/3), 0 false positives |
 | Known-error problem linked (recall) | 100% (5/5), 0 false positives |
 | Runbooks executed (after approval) | 13 |
@@ -22,11 +22,11 @@ Run: reasoner `heuristic`, source `local`, approver `simulate`, 24 incidents.
 | Incident | Pattern | Group | KB | Runbook | Root cause F1 | Change | Problem | Remediation |
 |---|---|---|---|---|---|---|---|---|
 | inc:0297 | P07_CERT_EXPIRY | ✅ | ✅ | ✅ | 1.00 | — | ✅ | manual |
-| inc:0298 | P08_BACKUP_FAILED | ✅ | ✅ | ✅ | 0.00 | — | — | automated (ran) |
+| inc:0298 | P08_BACKUP_FAILED | ✅ | ✅ | ✅ | 1.00 | — | — | automated (ran) |
 | inc:0299 | P17_SP_SECRET_EXPIRED | ✅ | ✅ | ✅ | 1.00 | — | — | manual |
 | inc:0300 | P13_STORAGE_THROTTLING | ✅ | ✅ | ✅ | 1.00 | — | — | manual |
 | inc:0301 | P06_SQL_BLOCKING | ✅ | ✅ | ✅ | 1.00 | — | — | manual |
-| inc:0302 | P15_FUNC_QUEUE_BACKLOG | ✅ | ✅ | ✅ | 1.00 | — | — | automated (ran) |
+| inc:0302 | P15_FUNC_QUEUE_BACKLOG | ✅ | ✅ | ✅ | 0.14 | — | — | automated (ran) |
 | inc:0303 | P02_VM_DISK_FULL | ✅ | ✅ | ✅ | 1.00 | — | — | automated (ran) |
 | inc:0304 | P05_SQL_DTU_EXHAUSTION | ✅ | ✅ | ✅ | 0.83 | — | ✅ | automated (ran) |
 | inc:0305 | P18_ADF_PIPELINE_FAILURE | ✅ | ✅ | ✅ | 1.00 | — | — | automated (ran) |
@@ -48,7 +48,7 @@ Run: reasoner `heuristic`, source `local`, approver `simulate`, 24 incidents.
 
 ## Misses
 
-- **inc:0298** [Recovery Services] Backup failed for vm-hr-batch-01 (ExtensionSnapshotFailedNoNetwork)
-  - root cause: predicted "VM was stopped/deallocated during backup window", expected "Transient snapshot extension failure (ExtensionSnapshotFailedNoNetwork)"
+- **inc:0302** [Azure Monitor] Sev2 - Service Bus active messages > 5000 (orders-queue)
+  - root cause: predicted "Function timeouts due to slow downstream SQL (DTU)", expected "Function plan max instances too low for peak"
 - **inc:0311** [Azure Monitor] Sev2 - Percentage CPU > 90% on vm-ecom-web-02 for 10 min
   - root cause: predicted "Runaway python3 process after long uptime", expected "Antimalware full scan scheduled during business hours"

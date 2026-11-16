@@ -27,11 +27,12 @@ log = logging.getLogger("aiops.orchestrator")
 
 class TriageOrchestrator:
     def __init__(self, itsm: ITSMClient, logs: LogAnalyticsClient, automation: AutomationClient,
-                 reasoner=None, approver: Optional[Approver] = None, update_tickets: bool = True):
+                 reasoner=None, approver: Optional[Approver] = None, update_tickets: bool = True,
+                 lookback_hours: Optional[int] = None):
         self.itsm = itsm
         self.knowledge = KnowledgeAgent(itsm)
         self.change = ChangeCorrelationAgent(itsm)
-        self.diagnostics = DiagnosticsAgent(logs)
+        self.diagnostics = DiagnosticsAgent(logs, **({} if lookback_hours is None else {"hours": lookback_hours}))
         self.groups = itsm.groups()
         self.reasoner = reasoner or HeuristicReasoner(self.groups)
         self.remediation = RemediationAgent(automation, approver)

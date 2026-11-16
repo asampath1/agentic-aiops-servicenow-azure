@@ -72,3 +72,31 @@ def test_live_writes_mark_in_progress_but_eval_writes_keep_state():
     assert live.open_tag == "SYNTH-SKR-LIVE" and live.tag == "SYNTH-SKR"
     evalset = ServiceNowITSM(instance="dev0", user="u", password="p")
     assert "state" not in evalset.update_incident(inc, {}, "note")["body"]
+
+
+def test_root_cause_confirmed_by_evidence_beats_the_common_history_cause():
+    # Live CPU run: 7 of 10 similar incidents say "Batch job ...", but this incident's own Syslog names python3.
+    from agents.models import Evidence
+    from agents.reasoner import HeuristicReasoner
+    kb = {"title": "Troubleshooting high CPU on Azure VMs", "key": "kb1", "score": 2.0, "resolver_group": "SKR Azure Infra Ops",
+          "runbook": "RB-VM-Restart-Service", "safe_to_automate": True, "symptoms": "", "cause": ""}
+    def sim(cause, score):
+        return {"key": cause[:5] + str(score), "number": None, "short_description": "cpu", "ci": "vm-orders-app-01",
+                "assignment_group": "SKR Azure Infra Ops", "root_cause": cause, "runbook": "RB-VM-Restart-Service",
+                "kb_article": kb["title"], "change_caused": False, "problem": None, "resolution": "", "score": score}
+    sims = [sim("Batch job overlapping with peak traffic", 39.0)] * 7 + [sim("Runaway sqlservr.exe process after long uptime", 38.0)]
+    ev = Evidence(kb_candidates=[kb], similar_incidents=sims, problem_candidates=[], change_candidates=[],
+                  diagnostics={"ran": True, "signals": {"process": ["python3"]}}, ci=None)
+    inc = Incident(key="INC1", short_description="[Azure Monitor] Sev2 - Percentage CPU > 90%", ci="vm-orders-app-01")
+    assert HeuristicReasoner(["SKR Azure Infra Ops"]).decide(inc, ev).root_cause == "Runaway python3 process after long uptime"
+    assert HeuristicReasoner(["SKR Azure Infra Ops"], evidence_bonus=0.0).decide(inc, ev).root_cause.startswith("Batch job")
+
+
+def test_signals_come_from_messages_not_perf_numbers_and_lookback_is_short():
+    from agents.diagnostics import DiagnosticsAgent
+    rows = [{"CounterName": "Available MBytes Memory", "avg_CounterValue": 526.9},
+            {"Message": "orders-report: python3 report worker stuck in a loop"}]
+    d = DiagnosticsAgent(FakeWorkspace(rows)).run(_live("Percentage CPU > 90% on vm-orders-app-01 for 15 min",
+                                                        "vm-cpu-high", "Percentage CPU: 99.1"))
+    assert d["signals"].get("process") == ["python3"] and "http_status" not in d["signals"]
+    assert DiagnosticsAgent(FakeWorkspace([])).hours == 2

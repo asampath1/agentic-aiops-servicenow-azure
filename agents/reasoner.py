@@ -50,8 +50,9 @@ def adapt_cause(cause: str, signals: dict[str, list[str]]) -> tuple[str, bool]:
 class HeuristicReasoner:
     name = "heuristic"
 
-    def __init__(self, groups: list[str], change_threshold: float = 0.5):
+    def __init__(self, groups: list[str], change_threshold: float = 0.5, evidence_bonus: float = 0.5):
         self.groups, self.change_threshold = groups, change_threshold
+        self.evidence_bonus = evidence_bonus
 
     def decide(self, inc: Incident, ev: Evidence) -> TriageDecision:
         sims, kbs = ev.similar_incidents, ev.kb_candidates
@@ -109,6 +110,7 @@ class HeuristicReasoner:
             # Vote over cause *templates*: specifics (versions, error codes, processes, KB numbers)
             # from past incidents are swapped for this incident's own signals where it has them.
             cands: dict[str, float] = defaultdict(float)
+            confirmed: set[str] = set()
             for s in sims:
                 if not s["root_cause"] or (kb and kb["runbook"] and s["runbook"] != kb["runbook"]):
                     continue
@@ -117,9 +119,14 @@ class HeuristicReasoner:
                     w *= 1.5
                 cause, filled = adapt_cause(s["root_cause"], signals)
                 cands[cause] += w * (1.5 if filled else 1.0)
+                if filled:
+                    confirmed.add(cause)
             total_w = sum(cands.values()) or 1.0
             for c in list(cands):
-                cands[c] = cands[c] / total_w + 0.5 * overlap(c, ctx)
+                # A cause whose specifics (process, error code, version, update) this incident's own evidence
+                # confirms beats a cause that is merely common in the history of this CI.
+                cands[c] = (cands[c] / total_w + 0.5 * overlap(c, ctx)
+                            + (self.evidence_bonus if c in confirmed else 0.0))
             if cands:
                 root = max(cands, key=cands.get)
             else:

@@ -32,7 +32,9 @@ worst case: anything the agent proposes would have run.
 | [Heuristic baseline](results/heuristic-baseline/report.md) | 24/24 | 22/22 | 24/24 | 22/24 | 3/3, 0 FP | 5/5, 0 FP | 0 |
 
 Read these numbers with the dataset in mind: the history is generated from the same 18 templates as the
-eval set, so retrieval finds near-duplicates. The two root-cause misses are cases where the generator
-picks the cause at random, independent of the alert text (for example a CPU alert naming `python3` labelled
-"Antimalware full scan"). Expect lower scores on free-text tickets and on a real estate; that is where the
+eval set, so retrieval finds near-duplicates. The two root-cause misses: inc:0311, where the generator picks
+the cause at random, independent of the alert text (a CPU alert naming `python3` labelled "Antimalware full
+scan"); and inc:0302, where most matching past incidents record a different cause and the alert carries no
+evidence that separates the two. Root cause rose from 21/24 to 22/24 when causes confirmed by the incident's own
+evidence (process, error code, version) started to outweigh causes that are merely common in the history. Expect lower scores on free-text tickets and on a real estate; that is where the
 Claude reasoner should earn its cost, and the next comparison to run.

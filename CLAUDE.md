@@ -45,7 +45,7 @@ cd synthetic-data && python3 load_to_snow.py --check                            
 ## Status (2026-11-12)
 - Done: dataset loaded into the PDI (612 records); offline heuristic baseline 24/24 routing, 0 unsafe actions.
 - Done: live PDI triage matches the offline baseline on all 24 incidents (24/24 routing, 22/22 KB, 5/5 problems,
-  root cause 21/24, 13/13 safe auto-remediation, 0 unsafe). Root cause was 22/24 before retrieval ties were made
+  root cause 21/24 at the time, 22/24 since the evidence bonus, 13/13 safe auto-remediation, 0 unsafe). Root cause was 22/24 before retrieval ties were made
   deterministic; inc:0302 was right by row-order luck (history majority favours the wrong cause).
 - Done: `--write` work notes posted to all 24 open eval incidents (`--approver deny`, 24x HTTP 200; also sets the
   assignment group). Work notes are a journal: another `--write` run adds a second note to every ticket.
@@ -72,10 +72,13 @@ cd synthetic-data && python3 load_to_snow.py --check                            
   `Auto-remediated (AIOps)` (choice added by `infra/servicenow/add_close_code.py`); otherwise a "needs review" note.
   Verified: INC0010598 (CPU, replayed resolved alert) and INC0010599 (disk, fully live: fired ~08:10Z, cleanup job,
   cleared 08:35Z, auto-resolved). Phase 4 complete.
-- Open findings: live root cause for the CPU run was "Batch job overlapping with peak traffic" (history vote; "Runaway
-  python3 process" fits); `http_status` signal regex matches Perf numbers (e.g. 526 MB); Diagnostics' 24 h lookback
-  carried the CPU fault's `python3` Syslog line into the disk proposal (ServiceName, harmless for cleanup); resolved log
-  alerts carry no measured value, so close notes show "(Log query result: )".
-- Next: tidy the findings above; README/portfolio write-up of the live demo.
+- Done (2026-11-16): live-demo write-up `docs/live-demo.md` with 12 portal/PDI screenshots.
+- Done (2026-11-16): the four live findings. (1) Root cause: a cause whose specifics this incident's own evidence
+  confirms gets `evidence_bonus` 0.5 (live CPU now "Runaway python3 process"; eval root cause 21/24 -> 22/24, F1 0.90;
+  measured 0/0.25/0.5/1.0 via `--evidence-bonus`). (2) Diagnostics signals only from log messages, not Perf numbers.
+  (3) Diagnostics lookback 24 h -> 2 h (`--lookback-hours`; eval identical 1-24 h; live disk no longer inherits the CPU
+  fault's `python3`). (4) Logic App omits the observed value when a resolved log alert has none (`Observed_note`;
+  needs an `alerts.bicep` redeploy).
+- Next: optional Claude reasoner run (needs API key); demo video.
   Phase 4 fixes: Diagnostics KQL uses `Available MBytes` (Linux reports `Available MBytes Memory`) and needs Syslog
   for the process name (Linux Perf has no per-process data).

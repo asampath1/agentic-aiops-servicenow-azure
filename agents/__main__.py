@@ -41,6 +41,11 @@ def main(argv=None) -> int:
     ap.add_argument("--live", action="store_true",
                     help="triage live-alert incidents (correlation_id SYNTH-SKR-LIVE) instead of the eval set; "
                          "servicenow source only")
+    ap.add_argument("--evidence-bonus", type=float, default=None,
+                    help="heuristic reasoner: extra score for a root cause whose specifics this incident's own "
+                         "evidence confirms (default: the reasoner's built-in value)")
+    ap.add_argument("--lookback-hours", type=int, default=None,
+                    help="Diagnostics: how far before the incident to query telemetry (default: the agent's built-in value)")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--out", default=None, help="output folder (default runs/<timestamp>)")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -79,13 +84,15 @@ def main(argv=None) -> int:
 
     approver = {"deny": DenyAll, "simulate": SimulatedApprover, "interactive": InteractiveApprover}[a.approver]()
     groups = itsm.groups()
+    hkw = {} if a.evidence_bonus is None else {"evidence_bonus": a.evidence_bonus}
     if a.reasoner == "claude":
         reasoner = ClaudeReasoner(groups, [k.title for k in itsm.kb_articles()], model=a.model, effort=a.effort,
-                                  fallback=HeuristicReasoner(groups))
+                                  fallback=HeuristicReasoner(groups, **hkw))
     else:
-        reasoner = HeuristicReasoner(groups)
+        reasoner = HeuristicReasoner(groups, **hkw)
 
-    orch = TriageOrchestrator(itsm, logs, automation, reasoner=reasoner, approver=approver)
+    orch = TriageOrchestrator(itsm, logs, automation, reasoner=reasoner, approver=approver,
+                              lookback_hours=a.lookback_hours)
     incidents = itsm.open_incidents()[: a.limit]
     print(f"Source {a.source}: {len(incidents)} open incidents, {len(orch.knowledge.history)} resolved incidents, "
           f"{len(orch.knowledge.kb)} KB articles, {len(orch.knowledge.problems)} problems, {len(groups)} groups")

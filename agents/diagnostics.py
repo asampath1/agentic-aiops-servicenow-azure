@@ -56,7 +56,10 @@ def family(ci: Optional[str]) -> Optional[str]:
 class DiagnosticsAgent:
     name = "diagnostics"
 
-    def __init__(self, logs: LogAnalyticsClient, hours: int = 24):
+    # 2 h before the incident (to 30 min after it is opened): long enough for a slowly building fault, short enough
+    # that an unrelated earlier event on the same CI stays out. On the live demo a 24 h window carried a CPU fault's
+    # Syslog line into a disk incident 1h43m later; the offline eval scores the same from 1 h to 24 h.
+    def __init__(self, logs: LogAnalyticsClient, hours: int = 2):
         self.logs, self.hours = logs, hours
 
     def run(self, inc: Incident) -> dict[str, Any]:
@@ -70,10 +73,13 @@ class DiagnosticsAgent:
         except Exception as e:  # telemetry is best-effort; triage continues without it
             return {"ran": False, "reason": f"query failed: {e}", "queries": [kql], "signals": {}, "findings": []}
         texts = [str(r.get("Message") or " ".join(f"{k}={v}" for k, v in r.items())) for r in rows]
+        # Signals come only from log messages (Syslog, Event, alert text) and the description: numeric rows
+        # such as Perf averages ("avg_CounterValue=526.9") would otherwise pass for HTTP status codes.
+        messages = [str(r["Message"]) for r in rows if r.get("Message")]
         signals: dict[str, list[str]] = {}
         for name, rx in _SIGNALS:
             found = []
-            for t in texts + [inc.description]:
+            for t in messages + [inc.description]:
                 for m in rx.findall(t):
                     if m not in found:
                         found.append(m)

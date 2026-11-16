@@ -37,10 +37,15 @@
       },
       "runAfter": {}
     },
+    "Observed_note": {
+      "type": "Compose",
+      "inputs": "@{if(empty(outputs('Alert')?['observed']), '', concat(' (', outputs('Alert')?['metric'], ': ', outputs('Alert')?['observed'], ')'))}",
+      "runAfter": { "Alert": [ "Succeeded" ] }
+    },
     "Init_successful_jobs": {
       "type": "InitializeVariable",
       "inputs": { "variables": [ { "name": "successfulJobs", "type": "array", "value": [] } ] },
-      "runAfter": { "Alert": [ "Succeeded" ] }
+      "runAfter": { "Observed_note": [ "Succeeded" ] }
     },
     "Fired_or_resolved": {
       "type": "If",
@@ -191,7 +196,7 @@
                       "body": {
                         "state": "6",
                         "close_code": "@{parameters('closeCodeValue')}",
-                        "close_notes": "Auto-remediated by AIOps. Approved runbook: @{join(variables('successfulJobs'), '; ')}. Azure Monitor alert @{outputs('Alert')?['rule']} cleared at @{outputs('Alert')?['resolvedAt']} (@{outputs('Alert')?['metric']}: @{outputs('Alert')?['observed']}). Reopen if the problem returns.",
+                        "close_notes": "Auto-remediated by AIOps. Approved runbook: @{join(variables('successfulJobs'), '; ')}. Azure Monitor alert @{outputs('Alert')?['rule']} cleared at @{outputs('Alert')?['resolvedAt']}@{outputs('Observed_note')}. Reopen if the problem returns.",
                         "work_notes": "[Azure Monitor] Alert @{outputs('Alert')?['rule']} resolved at @{outputs('Alert')?['resolvedAt']} after a successful approved runbook (@{join(variables('successfulJobs'), '; ')}). Incident resolved automatically."
                       },
                       "authentication": { "type": "Basic", "username": "@parameters('snUser')", "password": "@parameters('snPassword')" }
@@ -209,7 +214,7 @@
                         "uri": "https://@{parameters('snInstance')}.service-now.com/api/now/table/incident/@{body('Find_open_incident')?['result']?[0]?['sys_id']}",
                         "headers": { "Content-Type": "application/json" },
                         "body": {
-                          "work_notes": "[Azure Monitor] Alert @{outputs('Alert')?['rule']} cleared at @{outputs('Alert')?['resolvedAt']} (@{outputs('Alert')?['metric']}: @{outputs('Alert')?['observed']}), but no successful approved runbook job was found for this incident. Needs review: the symptom may have cleared on its own."
+                          "work_notes": "[Azure Monitor] Alert @{outputs('Alert')?['rule']} cleared at @{outputs('Alert')?['resolvedAt']}@{outputs('Observed_note')}, but no successful approved runbook job was found for this incident. Needs review: the symptom may have cleared on its own."
                         },
                         "authentication": { "type": "Basic", "username": "@parameters('snUser')", "password": "@parameters('snPassword')" }
                       },

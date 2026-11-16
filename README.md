@@ -31,6 +31,12 @@ flowchart TD
     O --> U[Ticket updater<br/>work notes, resolution back to SNOW]
 ```
 
+## Live demo
+
+Two real faults on an Azure VM went from **Azure Monitor alert → ServiceNow incident → multi-agent triage on real
+telemetry → human approval → Azure Automation runbook → incident auto-resolved**, with one click from a person.
+Timelines, screenshots, guardrails and what went wrong: **[docs/live-demo.md](docs/live-demo.md)**.
+
 ## Repo layout
 
 ```
@@ -38,20 +44,22 @@ synthetic-data/      ShopKart Retails ITSM dataset generator + ServiceNow loader
 agents/              triage orchestrator, specialist agents, ServiceNow/Azure connectors (offline mocks included)
 evaluation/          scoring against synthetic-data/data/ground_truth.json, plus committed results
 tests/               pytest suite, including answer-key isolation and remediation safety
-docs/                (planned) design notes, demo screenshots
+infra/               Bicep for the live Azure demo, runbooks, Logic App, fault scripts
+docs/                live demo write-up and screenshots
 ```
 
 ## Roadmap
 
 - [x] Synthetic enterprise data: 300+ incidents, CMDB, KB, changes, problems, and a 24-incident eval set
-- [ ] Load data into a ServiceNow PDI
+- [x] Load data into a ServiceNow PDI
 - [x] Triage orchestrator (routing + priority), heuristic and Claude reasoners
 - [x] Knowledge agent (BM25 over KB and resolved incidents; swap for vector search later)
 - [x] Change-correlation agent
 - [x] Diagnostics agent (KQL per resource type; synthetic workspace offline, Log Analytics connector for live)
 - [x] Remediation agent with approval gate (Azure Automation connector, KB-safe runbooks only)
 - [x] Evaluation scoring: routing, KB, runbook, root-cause match, change/problem linking, unsafe-action rate
-- [ ] Run against the live PDI and a free-tier Log Analytics workspace
+- [x] Run against the live PDI (matches the offline baseline on all 24 eval incidents)
+- [x] Live Azure loop: alert -> incident -> triage on Log Analytics -> approved runbook -> auto-resolve ([docs/live-demo.md](docs/live-demo.md))
 - [ ] Claude reasoner vs heuristic comparison on the eval set
 - [ ] MTTR saved (needs live timings)
 - [ ] Demo video

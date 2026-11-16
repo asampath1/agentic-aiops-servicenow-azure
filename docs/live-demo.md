@@ -7,6 +7,12 @@ Azure Automation runbook → alert clears → incident resolved with an *Auto-re
 Everything runs on a free-trial Azure subscription and a ServiceNow Personal Developer Instance (PDI). The company,
 people and tickets are synthetic (ShopKart Retails, tag `SYNTH-SKR`). Infrastructure: [`infra/`](../infra/README.md).
 
+A 40-second tour of the evidence (recorded in the Azure portal and the PDI after the runs): the deployed resources,
+the CPU fault, both alerts resolved, the disk-cleanup runbook's output, and INC0010599 going *New → In Progress →
+Resolved (Auto-remediated)*.
+
+![Evidence tour](live-demo/live-demo-tour.gif)
+
 ## The loop
 
 ```mermaid

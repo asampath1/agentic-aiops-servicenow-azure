@@ -37,6 +37,8 @@ Two real faults on an Azure VM went from **Azure Monitor alert → ServiceNow in
 telemetry → human approval → Azure Automation runbook → incident auto-resolved**, with one click from a person.
 Timelines, screenshots, guardrails and what went wrong: **[docs/live-demo.md](docs/live-demo.md)**.
 
+![40-second tour: resource diagram, CPU fault, resolved alerts, runbook output, ServiceNow incident lifecycle](docs/live-demo/live-demo-tour.gif)
+
 ## Repo layout
 
 ```

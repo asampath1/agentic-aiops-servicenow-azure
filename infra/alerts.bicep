@@ -19,6 +19,12 @@ param snPassword string
 param vmName string = 'vm-orders-app-01'
 param correlationTag string = 'SYNTH-SKR-LIVE'
 
+@description('Automation account whose job history decides whether a cleared alert was actually remediated.')
+param automationAccountName string = 'aa-skr-aiops'
+
+@description('Close code set when an incident is auto-resolved (added by infra/servicenow/add_close_code.py).')
+param closeCodeValue string = 'Auto-remediated (AIOps)'
+
 var tags = {
   project: 'agentic-aiops-servicenow-azure'
   dataset: 'SYNTH-SKR'
@@ -29,11 +35,18 @@ resource vm 'Microsoft.Compute/virtualMachines@2024-07-01' existing = {
   name: vmName
 }
 
+resource aa 'Microsoft.Automation/automationAccounts@2023-11-01' existing = {
+  name: automationAccountName
+}
+
 // ---------------------------------------------------------------- Logic App: alert -> ServiceNow
 resource la 'Microsoft.Logic/workflows@2019-05-01' = {
   name: 'la-skr-alert-to-snow'
   location: location
   tags: tags
+  identity: {
+    type: 'SystemAssigned' // reads the Automation job history (Reader on that account only)
+  }
   properties: {
     state: 'Enabled'
     definition: loadJsonContent('logicapp/alert-to-servicenow.json')
@@ -42,7 +55,20 @@ resource la 'Microsoft.Logic/workflows@2019-05-01' = {
       snUser: { value: snUser }
       snPassword: { value: snPassword }
       correlationTag: { value: correlationTag }
+      automationAccountId: { value: aa.id }
+      closeCodeValue: { value: closeCodeValue }
     }
+  }
+}
+
+// Read-only on the Automation account: list jobs and read their status/parameters. Cannot start jobs.
+resource laReadsJobs 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(aa.id, la.id, 'reader')
+  scope: aa
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'acdd72a7-3385-48ef-bd42-f606fba81ae7') // Reader
+    principalId: la.identity.principalId
+    principalType: 'ServicePrincipal'
   }
 }
 

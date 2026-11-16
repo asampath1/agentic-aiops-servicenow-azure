@@ -10,9 +10,15 @@ from .models import Incident, parse_ts
 
 # KQL per resource family (by Azure naming prefix). {r} is the resource name.
 KQL = {
-    "vm": ("union (Perf | where Computer startswith '{r}' and CounterName in ('% Processor Time','Available MBytes',"
-           "'% Free Space') | summarize avg(CounterValue) by CounterName, InstanceName, bin(TimeGenerated, 5m)), "
+    # isfuzzy: a Linux-only workspace has no Event table, a Windows-only one no Syslog. Linux names the memory
+    # counter 'Available MBytes Memory'. Process names come from Syslog/Event (Linux Perf has no per-process data).
+    "vm": ("union isfuzzy=true "
+           "(Perf | where Computer startswith '{r}' and CounterName in ('% Processor Time','Available MBytes',"
+           "'Available MBytes Memory','% Free Space') and InstanceName in ('total','_Total','/','C:','Memory') "
+           "| summarize avg(CounterValue) by CounterName, InstanceName, bin(TimeGenerated, 5m)), "
            "(Heartbeat | where Computer startswith '{r}' | summarize LastHeartbeat=max(TimeGenerated)), "
+           "(Syslog | where Computer startswith '{r}' and SeverityLevel in ('warning','err','crit','alert','emerg') "
+           "| project TimeGenerated, Message=strcat(ProcessName, ': ', SyslogMessage) | take 50), "
            "(Event | where Computer startswith '{r}' and EventLevelName in ('Error','Warning') | take 50)"),
     "sql": ("AzureDiagnostics | where Resource =~ '{r}' and Category in ('Blocks','QueryStoreRuntimeStatistics',"
             "'Errors','Timeouts') | take 100"),

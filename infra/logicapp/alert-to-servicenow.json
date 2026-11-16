@@ -6,7 +6,9 @@
     "snUser": { "type": "String" },
     "snPassword": { "type": "SecureString" },
     "correlationTag": { "type": "String", "defaultValue": "SYNTH-SKR-LIVE" },
-    "callerUserName": { "type": "String", "defaultValue": "synth.svc.azuremonitor" }
+    "callerUserName": { "type": "String", "defaultValue": "synth.svc.azuremonitor" },
+    "automationAccountId": { "type": "String" },
+    "closeCodeValue": { "type": "String", "defaultValue": "Auto-remediated (AIOps)" }
   },
   "triggers": {
     "manual": {
@@ -34,6 +36,11 @@
         "window": "@{triggerBody()?['data']?['alertContext']?['condition']?['windowSize']}"
       },
       "runAfter": {}
+    },
+    "Init_successful_jobs": {
+      "type": "InitializeVariable",
+      "inputs": { "variables": [ { "name": "successfulJobs", "type": "array", "value": [] } ] },
+      "runAfter": { "Alert": [ "Succeeded" ] }
     },
     "Fired_or_resolved": {
       "type": "If",
@@ -97,14 +104,14 @@
       },
       "else": {
         "actions": {
-          "Find_incident": {
+          "Find_open_incident": {
             "type": "Http",
             "inputs": {
               "method": "GET",
               "uri": "https://@{parameters('snInstance')}.service-now.com/api/now/table/incident",
               "queries": {
-                "sysparm_query": "correlation_id=@{parameters('correlationTag')}^correlation_display=@{outputs('Alert')?['alertGuid']}",
-                "sysparm_fields": "sys_id,number",
+                "sysparm_query": "correlation_id=@{parameters('correlationTag')}^correlation_display=@{outputs('Alert')?['alertGuid']}^stateIN1,2,3",
+                "sysparm_fields": "sys_id,number,state",
                 "sysparm_limit": "1"
               },
               "authentication": { "type": "Basic", "username": "@parameters('snUser')", "password": "@parameters('snPassword')" }
@@ -112,33 +119,114 @@
             "runtimeConfiguration": { "secureData": { "properties": [ "inputs" ] } },
             "runAfter": {}
           },
-          "If_found": {
+          "If_open_incident": {
             "type": "If",
             "expression": {
-              "and": [ { "greater": [ "@length(body('Find_incident')?['result'])", 0 ] } ]
+              "and": [ { "greater": [ "@length(body('Find_open_incident')?['result'])", 0 ] } ]
             },
             "actions": {
-              "Add_resolved_note": {
+              "List_completed_jobs": {
                 "type": "Http",
                 "inputs": {
-                  "method": "PATCH",
-                  "uri": "https://@{parameters('snInstance')}.service-now.com/api/now/table/incident/@{body('Find_incident')?['result']?[0]?['sys_id']}",
-                  "headers": { "Content-Type": "application/json" },
-                  "body": {
-                    "work_notes": "[Azure Monitor] Alert @{outputs('Alert')?['rule']} resolved at @{outputs('Alert')?['resolvedAt']} (@{outputs('Alert')?['metric']}: @{outputs('Alert')?['observed']})."
+                  "method": "GET",
+                  "uri": "https://management.azure.com@{parameters('automationAccountId')}/jobs",
+                  "queries": {
+                    "api-version": "2023-11-01",
+                    "$filter": "properties/status eq 'Completed' and properties/startTime ge @{formatDateTime(outputs('Alert')?['firedAt'], 'yyyy-MM-ddTHH:mm:ssZ')}"
                   },
-                  "authentication": { "type": "Basic", "username": "@parameters('snUser')", "password": "@parameters('snPassword')" }
+                  "authentication": { "type": "ManagedServiceIdentity", "audience": "https://management.azure.com" }
                 },
-                "runtimeConfiguration": { "secureData": { "properties": [ "inputs" ] } },
                 "runAfter": {}
+              },
+              "For_each_job": {
+                "type": "Foreach",
+                "foreach": "@body('List_completed_jobs')?['value']",
+                "runtimeConfiguration": { "concurrency": { "repetitions": 1 } },
+                "actions": {
+                  "Get_job": {
+                    "type": "Http",
+                    "inputs": {
+                      "method": "GET",
+                      "uri": "https://management.azure.com@{items('For_each_job')?['id']}",
+                      "queries": { "api-version": "2023-11-01" },
+                      "authentication": { "type": "ManagedServiceIdentity", "audience": "https://management.azure.com" }
+                    },
+                    "runAfter": {}
+                  },
+                  "If_job_for_this_incident": {
+                    "type": "If",
+                    "expression": {
+                      "and": [ { "equals": [
+                        "@body('Get_job')?['properties']?['parameters']?['IncidentNumber']",
+                        "@body('Find_open_incident')?['result']?[0]?['number']" ] } ]
+                    },
+                    "actions": {
+                      "Record_job": {
+                        "type": "AppendToArrayVariable",
+                        "inputs": {
+                          "name": "successfulJobs",
+                          "value": "@{body('Get_job')?['properties']?['runbook']?['name']} job @{body('Get_job')?['name']} completed @{body('Get_job')?['properties']?['endTime']}"
+                        },
+                        "runAfter": {}
+                      }
+                    },
+                    "else": { "actions": {} },
+                    "runAfter": { "Get_job": [ "Succeeded" ] }
+                  }
+                },
+                "runAfter": { "List_completed_jobs": [ "Succeeded" ] }
+              },
+              "If_remediated": {
+                "type": "If",
+                "expression": {
+                  "and": [ { "greater": [ "@length(variables('successfulJobs'))", 0 ] } ]
+                },
+                "actions": {
+                  "Resolve_incident": {
+                    "type": "Http",
+                    "inputs": {
+                      "method": "PATCH",
+                      "uri": "https://@{parameters('snInstance')}.service-now.com/api/now/table/incident/@{body('Find_open_incident')?['result']?[0]?['sys_id']}",
+                      "headers": { "Content-Type": "application/json" },
+                      "body": {
+                        "state": "6",
+                        "close_code": "@{parameters('closeCodeValue')}",
+                        "close_notes": "Auto-remediated by AIOps. Approved runbook: @{join(variables('successfulJobs'), '; ')}. Azure Monitor alert @{outputs('Alert')?['rule']} cleared at @{outputs('Alert')?['resolvedAt']} (@{outputs('Alert')?['metric']}: @{outputs('Alert')?['observed']}). Reopen if the problem returns.",
+                        "work_notes": "[Azure Monitor] Alert @{outputs('Alert')?['rule']} resolved at @{outputs('Alert')?['resolvedAt']} after a successful approved runbook (@{join(variables('successfulJobs'), '; ')}). Incident resolved automatically."
+                      },
+                      "authentication": { "type": "Basic", "username": "@parameters('snUser')", "password": "@parameters('snPassword')" }
+                    },
+                    "runtimeConfiguration": { "secureData": { "properties": [ "inputs" ] } },
+                    "runAfter": {}
+                  }
+                },
+                "else": {
+                  "actions": {
+                    "Add_review_note": {
+                      "type": "Http",
+                      "inputs": {
+                        "method": "PATCH",
+                        "uri": "https://@{parameters('snInstance')}.service-now.com/api/now/table/incident/@{body('Find_open_incident')?['result']?[0]?['sys_id']}",
+                        "headers": { "Content-Type": "application/json" },
+                        "body": {
+                          "work_notes": "[Azure Monitor] Alert @{outputs('Alert')?['rule']} cleared at @{outputs('Alert')?['resolvedAt']} (@{outputs('Alert')?['metric']}: @{outputs('Alert')?['observed']}), but no successful approved runbook job was found for this incident. Needs review: the symptom may have cleared on its own."
+                        },
+                        "authentication": { "type": "Basic", "username": "@parameters('snUser')", "password": "@parameters('snPassword')" }
+                      },
+                      "runtimeConfiguration": { "secureData": { "properties": [ "inputs" ] } },
+                      "runAfter": {}
+                    }
+                  }
+                },
+                "runAfter": { "For_each_job": [ "Succeeded" ] }
               }
             },
             "else": { "actions": {} },
-            "runAfter": { "Find_incident": [ "Succeeded" ] }
+            "runAfter": { "Find_open_incident": [ "Succeeded" ] }
           }
         }
       },
-      "runAfter": { "Alert": [ "Succeeded" ] }
+      "runAfter": { "Init_successful_jobs": [ "Succeeded" ] }
     }
   },
   "outputs": {}

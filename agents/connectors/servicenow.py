@@ -34,7 +34,12 @@ def _val(v: Any) -> Optional[str]:
 
 class ServiceNowITSM(ITSMClient):
     def __init__(self, instance: str | None = None, user: str | None = None, password: str | None = None,
-                 write: bool = False, timeout: int = 60, tag: str = TAG):
+                 write: bool = False, timeout: int = 60, tag: str = TAG, open_tag: str | None = None,
+                 mark_in_progress: bool = False):
+        """``tag`` selects history, KB and problems; ``open_tag`` (default: ``tag``) selects the incidents to
+        triage. Live alerts use ``SYNTH-SKR-LIVE`` so they never mix with the 24 eval incidents.
+        ``mark_in_progress`` sets state In Progress (2) on write: the AI has taken the ticket. Off for the eval
+        set, whose incidents must stay New (state 1) so later eval runs still find them."""
         import requests  # imported lazily so offline runs don't need it
 
         self.instance = instance or os.environ["SN_INSTANCE"]
@@ -43,6 +48,8 @@ class ServiceNowITSM(ITSMClient):
         self.s.auth = (user or os.environ["SN_USER"], password or os.environ["SN_PASSWORD"])
         self.s.headers.update({"Accept": "application/json", "Content-Type": "application/json"})
         self.write, self.timeout, self.tag = write, timeout, tag
+        self.open_tag = open_tag or tag
+        self.mark_in_progress = mark_in_progress
         self._group_ids: dict[str, str] = {}
         self._ci_cache: dict[str, Optional[ConfigItem]] = {}
 
@@ -88,7 +95,7 @@ class ServiceNowITSM(ITSMClient):
     def open_incidents(self) -> list[Incident]:
         # Not filtered on an empty assignment group: a PDI's assignment rules fill it from the CI's
         # support group on insert. Whatever is there is redacted before the agents see it.
-        rows = self._get("incident", f"correlation_id={self.tag}^state=1", self._INC_FIELDS)
+        rows = self._get("incident", f"correlation_id={self.open_tag}^state=1", self._INC_FIELDS)
         return [redact_open(self._incident(r)) for r in rows]
 
     def resolved_incidents(self) -> list[Incident]:
@@ -159,6 +166,8 @@ class ServiceNowITSM(ITSMClient):
         for k in ("impact", "urgency"):
             if k in fields:
                 body[k] = str(fields[k])
+        if self.mark_in_progress:
+            body["state"] = "2"   # In Progress; the Logic App resolves it once the alert clears after a successful runbook
         rec = {"incident": inc.number, "sys_id": inc.sys_id, "body": body, "sent": False, "target": self.base}
         if self.write and inc.sys_id:
             r = self.s.patch(f"{self.base}/api/now/table/incident/{inc.sys_id}", json=body, timeout=self.timeout)

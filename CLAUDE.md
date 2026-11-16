@@ -62,7 +62,20 @@ cd synthetic-data && python3 load_to_snow.py --check                            
   `vm-cpu-high` / `vm-disk-low` -> `ag-skr-servicenow` -> Logic App `la-skr-alert-to-snow` -> PDI incident tagged
   `correlation_id=SYNTH-SKR-LIVE` (alert id in `correlation_display`). Tested with a crafted Fired + Resolved payload:
   created INC0010597 (CI + caller resolved) and added the resolved work note. INC0010597 is a test incident.
-- Next: Phase 4 fault scripts + `--telemetry azure --automation azure` run; the ServiceNow connector must read open
-  incidents tagged `SYNTH-SKR-LIVE` while keeping `SYNTH-SKR` history for retrieval.
+- Done (2026-11-16): Azure Phase 4, first live loop (CPU): `infra/faults/inject.sh cpu` -> `vm-cpu-high` fired 06:42Z ->
+  INC0010598 -> `--live --telemetry azure --automation azure --approver interactive --write` (KB high CPU, `python3`
+  from real Syslog, RB-VM-Restart-Service approved) -> runaway stopped -> alert resolved 06:55Z -> resolved work note.
+  The first job "Completed" while its bash failed (PowerShell quoting); fixed, and runbooks now FAIL on any stderr.
+- Done (2026-11-16): auto-resolve. `--live --write` sets live incidents In Progress (eval set stays New). On a cleared
+  alert the Logic App (managed identity, Reader on the Automation account) resolves the incident only if a Completed
+  runbook job with that IncidentNumber started after the alert fired: state Resolved, close code
+  `Auto-remediated (AIOps)` (choice added by `infra/servicenow/add_close_code.py`); otherwise a "needs review" note.
+  Verified: INC0010598 (CPU, replayed resolved alert) and INC0010599 (disk, fully live: fired ~08:10Z, cleanup job,
+  cleared 08:35Z, auto-resolved). Phase 4 complete.
+- Open findings: live root cause for the CPU run was "Batch job overlapping with peak traffic" (history vote; "Runaway
+  python3 process" fits); `http_status` signal regex matches Perf numbers (e.g. 526 MB); Diagnostics' 24 h lookback
+  carried the CPU fault's `python3` Syslog line into the disk proposal (ServiceName, harmless for cleanup); resolved log
+  alerts carry no measured value, so close notes show "(Log query result: )".
+- Next: tidy the findings above; README/portfolio write-up of the live demo.
   Phase 4 fixes: Diagnostics KQL uses `Available MBytes` (Linux reports `Available MBytes Memory`) and needs Syslog
   for the process name (Linux Perf has no per-process data).

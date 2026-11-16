@@ -45,6 +45,9 @@ $tmp = Join-Path ([System.IO.Path]::GetTempPath()) "rb-cleanup-$([guid]::NewGuid
 Set-Content -Path $tmp -Value $script -NoNewline
 try {
     $r = Invoke-AzVMRunCommand -ResourceGroupName $rg -VMName $ResourceName -CommandId 'RunShellScript' -ScriptPath $tmp
-    $r.Value | ForEach-Object { Write-Output $_.Message }
+    $msg = ($r.Value | ForEach-Object { $_.Message }) -join "`n"
+    Write-Output $msg
+    # Run Command returns no exit code: treat anything on stderr as a failed remediation.
+    if ($msg -match '\[stderr\]\s*\S') { throw "Script on $ResourceName reported errors (see stderr above); remediation NOT confirmed." }
 }
 finally { Remove-Item $tmp -ErrorAction SilentlyContinue }

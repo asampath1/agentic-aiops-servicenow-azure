@@ -6,8 +6,9 @@ Offline (default, no credentials):
 With Claude as the reasoner (needs ANTHROPIC_API_KEY or `ant auth login`):
     python -m agents --reasoner claude --out runs/claude
 
-Against the live PDI + Azure (dry-run writes unless --write):
-    python -m agents --source servicenow --telemetry azure --automation azure --out runs/pdi
+Live alert loop (PDI incidents tagged SYNTH-SKR-LIVE, real Log Analytics + Automation, you approve):
+    python -m agents --source servicenow --live --telemetry azure --automation azure --approver interactive \
+        --write --out runs/live -v
 """
 from __future__ import annotations
 
@@ -37,6 +38,9 @@ def main(argv=None) -> int:
                     help="who approves runbooks. 'simulate' approves every proposal (worst case for safety "
                          "scoring) and is only allowed with --automation mock")
     ap.add_argument("--write", action="store_true", help="actually PATCH ServiceNow (servicenow source only)")
+    ap.add_argument("--live", action="store_true",
+                    help="triage live-alert incidents (correlation_id SYNTH-SKR-LIVE) instead of the eval set; "
+                         "servicenow source only")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--out", default=None, help="output folder (default runs/<timestamp>)")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -45,6 +49,8 @@ def main(argv=None) -> int:
 
     if a.approver == "simulate" and a.automation != "mock":
         ap.error("--approver simulate is only allowed with --automation mock")
+    if a.live and a.source != "servicenow":
+        ap.error("--live needs --source servicenow (live alerts arrive as ServiceNow incidents)")
     if a.write and a.approver == "simulate":
         ap.error("--write with --approver simulate would record approvals nobody gave; "
                  "use --approver deny (proposals only) or interactive")
@@ -56,7 +62,7 @@ def main(argv=None) -> int:
         itsm = LocalITSM(a.data_dir, outbox=out / "ticket_updates.jsonl")
     else:
         from .connectors.servicenow import ServiceNowITSM
-        itsm = ServiceNowITSM(write=a.write)
+        itsm = ServiceNowITSM(write=a.write, open_tag="SYNTH-SKR-LIVE" if a.live else None, mark_in_progress=a.live)
 
     if a.telemetry == "synthetic":
         # Works with either source: the stand-in workspace is built from the alert payloads in the incidents.

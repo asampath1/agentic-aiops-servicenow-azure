@@ -16,9 +16,9 @@ Resolved (Auto-remediated)*.
 ### Video: one run, start to finish (2:25)
 
 The third run (disk full, **INC0010600**) was screen-recorded. Waits are cut or sped up, captions explain each step, and
-browser bars are cropped out. Watch [live-demo/live-demo-run.mp4](live-demo/live-demo-run.mp4).
+browser bars are cropped out. Source file: [live-demo/live-demo-run.mp4](live-demo/live-demo-run.mp4).
 
-[![2:25 video: fault, alert, ServiceNow incident, triage with approval, runbook, auto-resolve](live-demo/live-demo-run-poster.jpg)](live-demo/live-demo-run.mp4)
+https://github.com/user-attachments/assets/bbbaeafc-4e35-4b1c-820e-4a331d87126e
 
 | Time (UTC) | What happened |
 |---|---|

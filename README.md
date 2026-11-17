@@ -6,6 +6,9 @@ human-in-the-loop approval. The repo includes a synthetic enterprise dataset and
 > **Disclaimer:** *ShopKart Retails (SKR)* is a fictional company. All people, emails, IPs, systems and
 > tickets in this repo are synthetic. No client or employer data is used.
 
+> **Status: complete (v1.0, November 2026).** The project is finished and kept as-is for reference. The live Azure
+> environment ran on a free trial and may no longer be running; [`infra/`](infra/README.md) recreates it.
+
 **New here or not technical?** Start with the plain-language overview: [docs/overview.md](docs/overview.md).
 
 ## Why this project
@@ -57,7 +60,7 @@ infra/               Bicep for the live Azure demo, runbooks, Logic App, fault s
 docs/                live demo write-up and screenshots
 ```
 
-## Roadmap
+## What was built
 
 - [x] Synthetic enterprise data: 300+ incidents, CMDB, KB, changes, problems, and a 24-incident eval set
 - [x] Load data into a ServiceNow PDI
@@ -69,9 +72,12 @@ docs/                live demo write-up and screenshots
 - [x] Evaluation scoring: routing, KB, runbook, root-cause match, change/problem linking, unsafe-action rate
 - [x] Run against the live PDI (matches the offline baseline on all 24 eval incidents)
 - [x] Live Azure loop: alert -> incident -> triage on Log Analytics -> approved runbook -> auto-resolve ([docs/live-demo.md](docs/live-demo.md))
-- [ ] Claude reasoner vs heuristic comparison on the eval set
-- [ ] MTTR saved (needs live timings)
 - [x] Demo video ([docs/live-demo/live-demo-run.mp4](docs/live-demo/live-demo-run.mp4))
+
+Not done in v1.0 (open ideas for anyone extending it):
+
+- Claude reasoner vs heuristic comparison on the eval set (code and tests are ready; needs an Anthropic API key)
+- MTTR saved, measured over repeated live runs
 
 ## Quick start
 

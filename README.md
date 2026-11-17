@@ -42,10 +42,7 @@ Timelines, screenshots, guardrails and what went wrong: **[docs/live-demo.md](do
 **Video (2:25):** one full run recorded live, from fault to auto-resolved incident, with captions:
 [docs/live-demo/live-demo-run.mp4](docs/live-demo/live-demo-run.mp4).
 
-
 https://github.com/user-attachments/assets/183de5f9-20be-470d-950c-8ff795306bf8
-
-
 
 ## Repo layout
 

@@ -18,7 +18,7 @@ Resolved (Auto-remediated)*.
 The third run (disk full, **INC0010600**) was screen-recorded. Waits are cut or sped up, captions explain each step, and
 browser bars are cropped out. Source file: [live-demo/live-demo-run.mp4](live-demo/live-demo-run.mp4).
 
-https://github.com/user-attachments/assets/bbbaeafc-4e35-4b1c-820e-4a331d87126e
+https://github.com/user-attachments/assets/183de5f9-20be-470d-950c-8ff795306bf8
 
 | Time (UTC) | What happened |
 |---|---|

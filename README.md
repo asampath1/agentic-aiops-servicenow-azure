@@ -42,7 +42,7 @@ Timelines, screenshots, guardrails and what went wrong: **[docs/live-demo.md](do
 **Video (2:25):** one full run recorded live, from fault to auto-resolved incident, with captions:
 [docs/live-demo/live-demo-run.mp4](docs/live-demo/live-demo-run.mp4).
 
-[![2:25 video: fault, alert, ServiceNow incident, triage with approval, runbook, auto-resolve](docs/live-demo/live-demo-run-poster.jpg)](docs/live-demo/live-demo-run.mp4)
+https://github.com/user-attachments/assets/bbbaeafc-4e35-4b1c-820e-4a331d87126e
 
 ## Repo layout
 

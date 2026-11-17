@@ -6,6 +6,8 @@ human-in-the-loop approval. The repo includes a synthetic enterprise dataset and
 > **Disclaimer:** *ShopKart Retails (SKR)* is a fictional company. All people, emails, IPs, systems and
 > tickets in this repo are synthetic. No client or employer data is used.
 
+**New here or not technical?** Start with the plain-language overview: [docs/overview.md](docs/overview.md).
+
 ## Why this project
 
 IT managed-services work is shifting from people working tickets to AI-run operations that are

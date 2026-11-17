@@ -33,11 +33,16 @@ flowchart TD
 
 ## Live demo
 
-Two real faults on an Azure VM went from **Azure Monitor alert → ServiceNow incident → multi-agent triage on real
+Real faults on an Azure VM went from **Azure Monitor alert → ServiceNow incident → multi-agent triage on real
 telemetry → human approval → Azure Automation runbook → incident auto-resolved**, with one click from a person.
 Timelines, screenshots, guardrails and what went wrong: **[docs/live-demo.md](docs/live-demo.md)**.
 
 ![40-second tour: resource diagram, CPU fault, resolved alerts, runbook output, ServiceNow incident lifecycle](docs/live-demo/live-demo-tour.gif)
+
+**Video (2:25):** one full run recorded live, from fault to auto-resolved incident, with captions:
+[docs/live-demo/live-demo-run.mp4](docs/live-demo/live-demo-run.mp4).
+
+[![2:25 video: fault, alert, ServiceNow incident, triage with approval, runbook, auto-resolve](docs/live-demo/live-demo-run-poster.jpg)](docs/live-demo/live-demo-run.mp4)
 
 ## Repo layout
 
@@ -64,7 +69,7 @@ docs/                live demo write-up and screenshots
 - [x] Live Azure loop: alert -> incident -> triage on Log Analytics -> approved runbook -> auto-resolve ([docs/live-demo.md](docs/live-demo.md))
 - [ ] Claude reasoner vs heuristic comparison on the eval set
 - [ ] MTTR saved (needs live timings)
-- [ ] Demo video
+- [x] Demo video ([docs/live-demo/live-demo-run.mp4](docs/live-demo/live-demo-run.mp4))
 
 ## Quick start
 

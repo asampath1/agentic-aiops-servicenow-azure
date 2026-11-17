@@ -1,6 +1,6 @@
 # Live demo: from Azure alert to auto-resolved ServiceNow incident
 
-On 2026-11-16 two real faults on an Azure VM went through the whole loop with no manual step except one
+On 2026-11-16 three real faults on an Azure VM went through the whole loop with no manual step except one
 approval: Azure Monitor alert → ServiceNow incident → multi-agent triage on real telemetry → human approval →
 Azure Automation runbook → alert clears → incident resolved with an *Auto-remediated (AIOps)* close code.
 
@@ -12,6 +12,21 @@ the CPU fault, both alerts resolved, the disk-cleanup runbook's output, and INC0
 Resolved (Auto-remediated)*.
 
 ![Evidence tour](live-demo/live-demo-tour.gif)
+
+### Video: one run, start to finish (2:25)
+
+The third run (disk full, **INC0010600**) was screen-recorded. Waits are cut or sped up, captions explain each step, and
+browser bars are cropped out. Watch [live-demo/live-demo-run.mp4](live-demo/live-demo-run.mp4).
+
+[![2:25 video: fault, alert, ServiceNow incident, triage with approval, runbook, auto-resolve](live-demo/live-demo-run-poster.jpg)](live-demo/live-demo-run.mp4)
+
+| Time (UTC) | What happened |
+|---|---|
+| 10:59:54 | `inject.sh disk`: `/` from 95 % to 5 % free |
+| 11:19:25 | `vm-disk-low` fired; the Logic App created **INC0010600** (New, default group *SKR App Support*) |
+| 11:23 | Triage on live data (39 Log Analytics rows): **SKR Azure Infra Ops**, P3, KB *Resolving low disk space on Azure VMs*, confidence 0.94; **RB-VM-Cleanup-Disk** approved at the prompt; incident In Progress |
+| 11:23:45 to 11:24:31 | Job `59b803bb` completed: 55 GB log truncated, `/` back to 5 % used |
+| 11:45:24 | Alert cleared; the Logic App resolved INC0010600 with close code *Auto-remediated (AIOps)* |
 
 ## The loop
 

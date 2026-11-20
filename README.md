@@ -6,8 +6,11 @@ human-in-the-loop approval. The repo includes a synthetic enterprise dataset and
 > **Disclaimer:** *ShopKart Retails (SKR)* is a fictional company. All people, emails, IPs, systems and
 > tickets in this repo are synthetic. No client or employer data is used.
 
-> **Status: complete (v1.0, November 2026).** The project is finished and kept as-is for reference. The live Azure
-> environment ran on a free trial and may no longer be running; [`infra/`](infra/README.md) recreates it.
+> **Status: complete (v1.0, November 2026; v1.1 adds the Claude reasoner comparison).** The project is finished and
+> kept as-is for reference. The live Azure environment ran on a free trial and may no longer be running;
+> [`infra/`](infra/README.md) recreates it.
+
+**Follow-on project:** [agentic-change-management-servicenow](https://github.com/asampath1/agentic-change-management-servicenow) (AI change risk and CAB recommendations).
 
 **New here or not technical?** Start with the plain-language overview: [docs/overview.md](docs/overview.md).
 
@@ -73,10 +76,11 @@ docs/                live demo write-up and screenshots
 - [x] Run against the live PDI (matches the offline baseline on all 24 eval incidents)
 - [x] Live Azure loop: alert -> incident -> triage on Log Analytics -> approved runbook -> auto-resolve ([docs/live-demo.md](docs/live-demo.md))
 - [x] Demo video ([docs/live-demo/live-demo-run.mp4](docs/live-demo/live-demo-run.mp4))
+- [x] Claude reasoner vs heuristic on the eval set (v1.1, [results](evaluation/README.md#results)): same routing,
+  KB, runbook and safety scores; lower root-cause match
 
-Not done in v1.0 (open ideas for anyone extending it):
+Not done (open ideas for anyone extending it):
 
-- Claude reasoner vs heuristic comparison on the eval set (code and tests are ready; needs an Anthropic API key)
 - MTTR saved, measured over repeated live runs
 
 ## Quick start

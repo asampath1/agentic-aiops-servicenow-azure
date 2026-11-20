@@ -50,8 +50,9 @@ cd synthetic-data && python3 load_to_snow.py --check                            
 - Done: `--write` work notes posted to all 24 open eval incidents (`--approver deny`, 24x HTTP 200; also sets the
   assignment group). Work notes are a journal: another `--write` run adds a second note to every ticket.
   `--write` refuses `--approver simulate`; simulated jobs are labelled SIMULATED in notes.
-- Deferred (2026-11-15): the live Claude reasoner run, until an Anthropic API key is bought. Code + stub tests are ready
-  (`python -m agents --reasoner claude --out runs/claude -v`, ~$1-2, no `--write`).
+- Done (2026-11-20, v1.1): the Claude reasoner run, offline, one run ($0.62): routing/KB/runbook/change/problem/safety
+  identical to the heuristic; root cause 12/24 (wordier answers, and recall 0.79 vs 0.90). Results in
+  `evaluation/results/claude/`. Don't rerun to chase the score.
 - Done (2026-11-15): Azure Phase 1 deployed: workspace `law-skr-aiops`, `vm-orders-app-01` (Ubuntu, B2ats_v2, no public
   IP, AMA + DCR for Perf/Syslog/Heartbeat, auto-shutdown 22:00 IST). Linux only; the Windows/IIS scenario was dropped
   to save credit.
@@ -79,6 +80,6 @@ cd synthetic-data && python3 load_to_snow.py --check                            
   (3) Diagnostics lookback 24 h -> 2 h (`--lookback-hours`; eval identical 1-24 h; live disk no longer inherits the CPU
   fault's `python3`). (4) Logic App omits the observed value when a resolved log alert has none (`Observed_note`;
   needs an `alerts.bicep` redeploy).
-- Next: optional Claude reasoner run (needs API key); demo video.
+- Complete. v1.0 tag 2026-11-17; v1.1 adds the Claude comparison and the link to the follow-on project.
   Phase 4 fixes: Diagnostics KQL uses `Available MBytes` (Linux reports `Available MBytes Memory`) and needs Syslog
   for the process name (Linux Perf has no per-process data).
